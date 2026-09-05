@@ -1,9 +1,13 @@
 extends Node2D
 
+const HistorySlots = preload("res://scripts/view/history_slots.gd")
+
 var game
 var camera: Vector2 = Vector2(6.5, 1.0)
 var unit_scale: float = 80.0
 var _speckles: Array = []
+var _slots_cache: Dictionary = {"merged": false, "batched_count": 0, "batches": [], "items": []}
+var _slots_history_size: int = -1
 
 const WALL = Color("465b68")
 const DARK = Color("17252f")
@@ -88,9 +92,14 @@ func _draw() -> void:
 	var state = game.service.state
 	if game.sensing:
 		_sense()
-	var history_start: int = maxi(0, state.history.size() - 200)
-	for index in range(history_start, state.history.size()):
-		var item: Dictionary = state.history[index]
+	_update_history_slots(state)
+	for batch in _slots_cache.batches:
+		var screen_lines: PackedVector2Array = PackedVector2Array()
+		screen_lines.resize(batch.lines.size())
+		for i in range(batch.lines.size()):
+			screen_lines[i] = to_screen(batch.lines[i])
+		draw_multiline(screen_lines, Color(0.51, 0.45, 0.38, 0.22), maxf(0.7, 0.03 * unit_scale), true)
+	for item in _slots_cache.items:
 		if item.type == "edge":
 			_polyline(item.data.points, Color(0.51, 0.45, 0.38, 0.28), 0.025)
 		else:
@@ -142,6 +151,15 @@ func _draw() -> void:
 	_preview()
 	if game.memory_remaining > 0.0:
 		_memory_glow()
+
+
+func _update_history_slots(state) -> void:
+	if _slots_history_size == state.history.size():
+		return
+	_slots_cache = HistorySlots.compute(state.history)
+	_slots_history_size = state.history.size()
+	if _slots_cache.merged and game.has_method("notice_history_merged"):
+		game.notice_history_merged(_slots_cache.batched_count)
 
 
 func _background() -> void:

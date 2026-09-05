@@ -40,6 +40,7 @@ var _ending_from_scale: float = 80.0
 var _ending_target: Dictionary = {}
 var _capture_path: String = ""
 var _capture_frames: int = 0
+var _history_merged_announced: bool = false
 
 
 func _ready() -> void:
@@ -83,6 +84,13 @@ func continue_game() -> void:
 	hud.set_message(load_status.reason if load_status.recovered else objective())
 
 
+func notice_history_merged(batched_count: int) -> void:
+	if _history_merged_announced:
+		return
+	_history_merged_announced = true
+	hud.set_message("旧痕迹已合并显示；%d 段历史仍完整保留在档案中。" % batched_count)
+
+
 func _activate_state(plant) -> void:
 	service = Commands.new(plant, Level.new())
 	sim = Simulation.new(service)
@@ -102,6 +110,7 @@ func _activate_state(plant) -> void:
 	memory_remaining = 0.0
 	ending_elapsed = -1.0
 	_events_seen = plant.events.size()
+	_history_merged_announced = false
 	world.camera = Vector2(6.5, 1.0)
 	world.unit_scale = 80.0
 	if plant.won:
