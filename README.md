@@ -2,9 +2,23 @@
 
 Godot 4.7.2 / GDScript / Compatibility。一个以生长代替移动、以修剪重新分配资源的二维探索游戏。
 
-开发分支 `grow-p0`，工作区位于原 Grow 仓库的 `.worktrees/grow-p0`。正式规格在 [docs/design-v1](docs/design-v1/README.md)，实施进展在 [开发账本](docs/development/PROGRESS.md)。当前版本已打通第一章开局、通关、存档与继续流程，仍在完成性能、完整反馈、美术音频和发布验收。
+开发分支 `grow-p0`，工作区位于原 Grow 仓库的 `.worktrees/grow-p0`。正式规格在 [docs/design-v1](docs/design-v1/README.md)，实施进展在 [开发账本](docs/development/PROGRESS.md)。当前版本已打通第一章开局、通关、存档与继续流程，音频与音量设置、历史合批、关卡检查器与性能门禁已落地，Windows 独立包已发布并通过脱离编辑器的人工通关验证。
 
-## 启动
+## 版本记录
+
+- **0.1.0（2026-09-05）**：P0 第一章「空房间」。两根接水、三藤开局、锚点攀附、W2 线索链、修剪与伤痕、退守种子、不可变世代存档、窗外通关与镜头回顾。程序化音频（7 动作音 + 循环环境声）与暂停菜单音量设置；200 表现槽历史合批；关卡检查器 13 项报告（`tools/validate_level.gd`）；性能达逻辑步 p95≤3ms、全量求解 p95≤8ms。Windows x86_64 独立包（`build/grow-0.1.0-windows/Grow.exe`，嵌入 PCK）经脱离编辑器真人通关验证（第75代存档校验和匹配、won=true、零退守一次通关）。已知限制：程序绘制美术路线、性能整帧 p95 待正式采样、存档断电持久性不作保证。
+
+## 独立包
+
+发布物为 `build/grow-0.1.0-windows/Grow.exe`（x86_64，嵌入数据包，无外部依赖），双击即玩。重新导出：
+
+```powershell
+& 'D:/game/GameDev/Tools/GoDot/Godot_v4.7.2-stable_win64_console.exe' --headless --path 'd:/game/GameDev/Projects/Grow/.worktrees/grow-p0' --export-release 'Windows Desktop'
+```
+
+导出模板为同版本 `Godot_v4.7.2-stable_export_templates.tpz` 解压至 Godot 用户模板目录。资产许可见 [assets/LICENSES.md](assets/LICENSES.md)。
+
+## 启动（开发）
 
 用本机 Godot 打开 `project.godot` 并按 F5，或在本目录运行：
 
