@@ -2,6 +2,7 @@
 .worktrees/
 .superpowers/
 builds/
+build/
 test-results/
 *.tmp
 docs/design-v1/review/render-*/
