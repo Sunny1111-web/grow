@@ -2,11 +2,11 @@
 
 Godot 4.7.2 / GDScript / Compatibility。一个以生长代替移动、以修剪重新分配资源的二维探索游戏。
 
-开发分支 `grow-p0`，工作区位于原 Grow 仓库的 `.worktrees/grow-p0`。正式规格在 [docs/design-v1](docs/design-v1/README.md)，实施进展在 [开发账本](docs/development/PROGRESS.md)。当前为开发中的可操作版本，尚未完成全部关卡与发布验收。
+开发分支 `grow-p0`，工作区位于原 Grow 仓库的 `.worktrees/grow-p0`。正式规格在 [docs/design-v1](docs/design-v1/README.md)，实施进展在 [开发账本](docs/development/PROGRESS.md)。当前版本已打通第一章开局、通关、存档与继续流程，仍在完成性能、完整反馈、美术音频和发布验收。
 
 ## 启动
 
-用本机 Godot 打开 `project.godot` 并按 F6/F5（运行整个项目用 F5），或在本目录运行：
+用本机 Godot 打开 `project.godot` 并按 F5，或在本目录运行：
 
 ```powershell
 & 'D:/game/GameDev/Tools/GoDot/Godot_v4.7.2-stable_win64_console.exe' --path .
@@ -25,6 +25,7 @@ Godot 4.7.2 / GDScript / Compatibility。一个以生长代替移动、以修剪
 | 催生 | 按住 F，同时加速收入与风险，到够用或危险时自动停止 |
 | 平移 / 缩放 / 回选中点 | 中键拖动 / 滚轮 / Home |
 | 重叠目标切换 | Tab |
+| 保存 / 继续 | F5 或暂停菜单保存；标题页继续上次进度 |
 | 暂停 / 退守种子 | Esc 或右上按钮；暂停菜单提供退守预览 |
 
 ## 验证
@@ -33,8 +34,11 @@ Godot 4.7.2 / GDScript / Compatibility。一个以生长代替移动、以修剪
 ./tools/Invoke-Tests.ps1
 ./tools/Invoke-Tests.ps1 -Suite commands
 ./tools/Invoke-Tests.ps1 -OpeningWindow
+./tools/Invoke-Tests.ps1 -JourneyWindow
 ```
 
-脚本把日志和截图写入唯一的 `test-results/run-*`，遇到 Godot 脚本/渲染错误或失败断言都会返回非零。窗口回放通过实际输入处理器完成首叶，并核对器官数与产能；它不能替代新玩家测试。
+脚本把日志和截图写入唯一的 `test-results/run-*`，遇到 Godot 脚本/渲染错误或失败断言都会返回非零。窗口回放通过实际输入处理器完成首叶，并核对器官数与产能；完整窗口回放进一步验证第二水源、支点与强化、健康足水3秒的窗外结尾、镜头回顾以及保存后继续。它们不能替代新玩家测试。
+
+存档默认在 Godot 的 `user://saves/chapter1`，每代使用新文件；F5、每10条有效命令、首片有效叶、退守、记忆、结尾与正常退出会保存。坏代会回退并提示，未来格式会拒绝加载。测试和窗口回放使用 `test-results` 内的独立存档目录。
 
 所有修订先完整备份原件至 `C:/backup/当日年月日` 并追加迁移日志，不直接删除旧内容。Git 按阶段提交，仅本地，不自动推送。

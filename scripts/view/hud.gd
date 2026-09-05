@@ -41,9 +41,12 @@ func _ready() -> void:
 	top.add_child(brand)
 	brand.add_child(_label("G R O W", 30, PAPER))
 	brand.add_child(_label("向 光 而 生  /  第一章 · 空房间", 13, Color("87969c")))
+	var resource_panel = PanelContainer.new()
+	resource_panel.custom_minimum_size = Vector2(340, 0)
+	resource_panel.add_theme_stylebox_override("panel", _box(Color(0.065, 0.1, 0.12, 0.94), 8, Color("465b68"), 10))
+	top.add_child(resource_panel)
 	var resources = VBoxContainer.new()
-	resources.custom_minimum_size = Vector2(340, 0)
-	top.add_child(resources)
+	resource_panel.add_child(resources)
 	energy_label = _label("能量 30 / 40", 20, GREEN)
 	resources.add_child(energy_label)
 	energy_bar = ProgressBar.new()
@@ -145,14 +148,22 @@ func close_modal() -> void:
 
 func show_title() -> void:
 	var content = _modal("向 光 而 生", "一颗种子，落在无人居住的房间。\n伸出根，触碰水。沿着遗留的家具，寻找窗外的光。\n\n你长出的身体，就是你走过的路。")
-	content.add_child(_button("开始生长", game.start_new_game))
+	if game.load_status.get("ok", false):
+		content.add_child(_button("继续上次的生长", game.continue_game))
+	elif game.load_status.get("found", false):
+		var notice = _label(game.load_status.reason, 15, Color("d79b67"))
+		notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		content.add_child(notice)
+	content.add_child(_button("开始新的生长" if game.load_status.get("found", false) else "开始生长", game.start_new_game))
 	content.add_child(_label("拖拽引导生长  /  预览时暂停  /  随时可以退守种子", 14, Color("87969c")))
 
 
 func show_pause() -> void:
 	var content = _modal("留一点时间，观察", "根接水，叶获取光能。藤需要支点，也需要持续供水。\n生长不只是向前；修剪能让资源重新抵达重要的枝叶。")
 	content.add_child(_button("继续生长", game.resume_game))
+	content.add_child(_button("保存进度  ·  F5", game.save_progress.bind(true)))
 	content.add_child(_button("退守种子…", game.show_rescue))
+	content.add_child(_button("保存并退出", game.request_quit))
 	content.add_child(_label("1 根 · 2 藤 · 3 叶 · 4 强化\n空格感知 · Shift 修剪 · F 催生\n中键平移 · 滚轮缩放 · Home 回到选中点", 16, PAPER))
 
 
@@ -163,8 +174,9 @@ func show_rescue() -> void:
 
 
 func show_victory() -> void:
-	var content = _modal("窗外，还有光", "你从地板下醒来，借着旧物，长成了自己的路。\n那些剪去的枝、留下的伤口，也成为这株植物的一部分。\n\n第一章 · 空房间  完成")
-	content.add_child(_button("看看我的植物", game.resume_game))
+	var content = _modal("G R O W  ·  向光而生", "你从地板下醒来，借着旧物，长成了自己的路。\n那些剪去的枝、留下的伤口，也成为这株植物的一部分。\n\n第一章 · 空房间  完成")
+	content.add_child(_button("继续观察", game.resume_game))
+	content.add_child(_button("返回标题", game.return_to_title))
 
 
 func _modal(title: String, body: String) -> VBoxContainer:

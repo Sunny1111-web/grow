@@ -25,11 +25,12 @@ static func solve(state, env) -> Dictionary:
 		var total: float = 0.0
 		for offset in [-0.1, 0.0, 0.1]:
 			var origin: Vector2 = shape.center + offset * shape.axis
-			var end: Vector2 = origin + direction * RAY_LENGTH
+			var ray_length: float = clampf(float(fixture.get("distance", RAY_LENGTH)), 0.0, RAY_LENGTH)
+			var end: Vector2 = origin + direction * ray_length
 			var transmission: float = 0.0 if env.ray_blocked(origin, end) else 1.0
 			if transmission > 0.0:
 				for other_id in shapes:
-					if other_id != leaf.id and _intersects(origin, direction, shapes[other_id]):
+					if other_id != leaf.id and _intersects(origin, direction, shapes[other_id], ray_length):
 						transmission *= 0.5
 			total += transmission
 		var mean: float = total / 3.0
@@ -38,7 +39,7 @@ static func solve(state, env) -> Dictionary:
 	return result
 
 
-static func _intersects(origin: Vector2, direction: Vector2, shape: Dictionary) -> bool:
+static func _intersects(origin: Vector2, direction: Vector2, shape: Dictionary, ray_length: float = RAY_LENGTH) -> bool:
 	var start: Vector2 = (origin - shape.center).rotated(-shape.angle) / Vector2(0.2, 0.1)
 	var ray: Vector2 = direction.rotated(-shape.angle) / Vector2(0.2, 0.1)
 	var a: float = ray.dot(ray)
@@ -49,4 +50,4 @@ static func _intersects(origin: Vector2, direction: Vector2, shape: Dictionary) 
 		return false
 	var low: float = (-b - sqrt(discriminant)) / (2.0 * a)
 	var high: float = (-b + sqrt(discriminant)) / (2.0 * a)
-	return high > 0.00001 and low < RAY_LENGTH
+	return high > 0.00001 and low < ray_length

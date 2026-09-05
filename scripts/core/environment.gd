@@ -118,15 +118,18 @@ func stimulus(state, origin: Vector2, kind: String) -> Vector2:
 				nearest = delta.normalized()
 		return nearest
 	var candidates: Array = []
+	var connected: Dictionary = {}
+	for access in water_contacts(state):
+		connected[access.access_id] = true
 	for water in waters:
-		candidates.append({"id": water.id, "pos": water.rect.get_center()})
+		if not connected.has(water.id):
+			candidates.append({"id": water.id, "pos": water.rect.get_center()})
 	for clue in clues:
-		candidates.append(clue)
+		if clue.id not in state.revealed:
+			candidates.append(clue)
 	var distance: float = 2.400001
 	var direction: Vector2 = Vector2.ZERO
 	for item in candidates:
-		if item.id in state.revealed:
-			continue
 		var delta: Vector2 = item.pos - origin
 		if delta.length() < distance and delta.length() > 0.1:
 			distance = delta.length()

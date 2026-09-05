@@ -58,6 +58,12 @@ func run(t) -> void:
 	isolated.lights = [{"id": "weak", "rect": Rect2(-2, -2, 4, 4), "intensity": 0.2, "direction": Vector2.UP},
 		{"id": "strong", "rect": Rect2(-1, -1, 2, 2), "intensity": 1.0, "direction": Vector2.UP}]
 	t.near(isolated.light_at(Vector2.ZERO).intensity, 1.0, 0.0001, "Overlapping light fixtures take max")
+	var near_water = model.create()
+	var near_root: int = near_water.add_edge(1, "root", [Vector2(2, -0.8), Vector2(2, -1.6)])
+	var near_tip: int = near_water.edges[near_root].b
+	env.reveal(near_water, near_water.nodes[near_tip].pos)
+	t.check("W1" in near_water.revealed and env.water_contacts(near_water).is_empty(), "Water is visible before physical contact")
+	t.check(env.stimulus(near_water, near_water.nodes[near_tip].pos, "root").dot(Vector2(0, -1)) > 0.95, "A revealed but unconnected water source still guides the root")
 	var no_hint = model.create(Vector2(0, -3.8))
 	t.check(env.stimulus(no_hint, Vector2(0, -3.8), "root") == Vector2.ZERO, "Hidden water outside perception cannot steer roots")
 	var reveal_before: int = no_hint.explored.size()

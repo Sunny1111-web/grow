@@ -42,12 +42,14 @@ class LightEnvironment:
 	var direction: Vector2 = Vector2(0, 1)
 	var wall: bool = false
 	var all_wall: bool = false
+	var distance: float = 64.0
+	var wall_y: float = 1000.0
 	var queries: Array = []
 	func light_at(_point: Vector2) -> Dictionary:
-		return {"intensity": intensity, "direction": direction, "id": "fixture"}
+		return {"intensity": intensity, "direction": direction, "id": "fixture", "distance": distance}
 	func ray_blocked(from: Vector2, to: Vector2) -> bool:
 		queries.append([from, to])
-		return all_wall or (wall and from.x > 0.05)
+		return all_wall or (wall and from.x > 0.05) or (from.y < wall_y and to.y >= wall_y)
 
 func run(t) -> void:
 	var paths: Array = ["res://scripts/core/water_solver.gd", "res://scripts/core/support_solver.gd", "res://scripts/core/light_solver.gd"]
@@ -251,6 +253,10 @@ func _light_extremes(t) -> void:
 	_leaf_center(state, Vector2(0, -1))
 	var result = light.solve(state, env)
 	t.near(result[target].light, 1.0, EPS, "叶背后轮廓不挡指向光源射线")
+	env.distance = 2.0
+	env.wall_y = 3.0
+	result = light.solve(state, env)
+	t.near(result[target].light, 1.0, EPS, "局部光源背后的墙不会遮挡反射光")
 	env.intensity = 0.0
 	result = light.solve(state, env)
 	t.near(result[target].light, 0.0, EPS, "零强度不产光")

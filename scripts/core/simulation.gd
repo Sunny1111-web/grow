@@ -1,6 +1,7 @@
 extends RefCounted
 
 const Commands = preload("res://scripts/core/command_service.gd")
+const Narrative = preload("res://scripts/core/narrative.gd")
 const STEP: float = 0.1
 
 var service
@@ -98,6 +99,7 @@ func step(dt: float) -> void:
 	state.tick += 1
 	state.revision += 1
 	metrics = service.metrics()
+	last_events.append_array(Narrative.evaluate(state, metrics, service.env))
 	_update_exit(dt)
 	if state.energy < 3.0 and metrics.income < 0.05:
 		state.dry_hint_time += dt

@@ -3,11 +3,16 @@ extends Node2D
 const Model = preload("res://scripts/core/plant_state.gd")
 const Level = preload("res://scripts/core/environment.gd")
 const Commands = preload("res://scripts/core/command_service.gd")
+const Saves = preload("res://scripts/core/save_service.gd")
 const Simulation = preload("res://scripts/core/simulation.gd")
 const World = preload("res://scripts/view/world_view.gd")
 const Hud = preload("res://scripts/view/hud.gd")
 
 var service
+var saves
+var save_directory: String = "user://saves/chapter1"
+var load_status: Dictionary = {}
+var commands_since_save: int = 0
 var sim
 var world
 var hud
@@ -27,11 +32,25 @@ var command_serial: int = 0
 var started: bool = false
 var _victory_shown: bool = false
 var _rescue_shown: bool = false
+var memory_remaining: float = 0.0
+var ending_elapsed: float = -1.0
+var _events_seen: int = 0
+var _ending_from_camera: Vector2 = Vector2.ZERO
+var _ending_from_scale: float = 80.0
+var _ending_target: Dictionary = {}
 var _capture_path: String = ""
 var _capture_frames: int = 0
 
 
 func _ready() -> void:
+	get_tree().auto_accept_quit = false
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--capture="):
+			_capture_path = argument.trim_prefix("--capture=")
+	if _capture_path != "":
+		save_directory = "res://test-results/capture-saves-%d" % Time.get_ticks_usec()
+	saves = Saves.new(save_directory)
+	load_status = saves.load_latest()
 	service = Commands.new(Model.create(), Level.new())
 	sim = Simulation.new(service)
 	world = World.new()
@@ -50,22 +69,65 @@ func _ready() -> void:
 
 
 func start_new_game() -> void:
-	service = Commands.new(Model.create(), Level.new())
+	_activate_state(Model.create())
+	hud.set_message("从种子向下拖出两段根，寻找裂缝深处的水。按住空格感知湿润方向。")
+	save_progress()
+
+
+func continue_game() -> void:
+	load_status = saves.load_latest()
+	if not load_status.ok:
+		hud.set_message(load_status.reason)
+		return
+	_activate_state(load_status.state)
+	hud.set_message(load_status.reason if load_status.recovered else objective())
+
+
+func _activate_state(plant) -> void:
+	service = Commands.new(plant, Level.new())
 	sim = Simulation.new(service)
 	selected_node = 1
 	selected_edge = 0
-	selected_tool = "root"
+	selected_tool = "root" if service.env.water_contacts(plant).is_empty() else "vine"
 	proposal = {}
 	animation_remaining = 0.0
 	started = true
-	_victory_shown = false
+	_victory_shown = plant.won
 	_rescue_shown = false
 	sensing = false
 	pruning = false
+	dragging = false
+	panning = false
+	commands_since_save = 0
+	memory_remaining = 0.0
+	ending_elapsed = -1.0
+	_events_seen = plant.events.size()
 	world.camera = Vector2(6.5, 1.0)
 	world.unit_scale = 80.0
+	if plant.won:
+		var framing: Dictionary = world.growth_framing()
+		world.camera = framing.camera
+		world.unit_scale = framing.scale
 	hud.close_modal()
-	hud.set_message("从种子向下拖出两段根，寻找裂缝深处的水。按住空格感知湿润方向。")
+
+
+func save_progress(manual: bool = false) -> Dictionary:
+	if not started:
+		return {"ok": true, "reason": "尚未开始游戏"}
+	var result: Dictionary = saves.save(service.state)
+	if result.ok:
+		commands_since_save = 0
+	if manual or not result.ok:
+		hud.set_message(result.reason)
+	return result
+
+
+func request_quit() -> void:
+	var result: Dictionary = save_progress()
+	if result.ok:
+		get_tree().quit()
+	else:
+		hud.set_message(result.reason + "。窗口已保留，可重试保存。")
 
 
 func _process(delta: float) -> void:
@@ -80,9 +142,9 @@ func _process(delta: float) -> void:
 			_rescue_shown = true
 			show_rescue()
 		if service.state.won and not _victory_shown:
-			_victory_shown = true
-			sim.set_frozen("menu", true)
-			hud.show_victory()
+			_begin_ending()
+	_present_events()
+	_update_presentation(delta)
 	hud.refresh()
 	world.queue_redraw()
 	if _capture_path != "":
@@ -102,7 +164,9 @@ func _capture() -> void:
 func _notification(what: int) -> void:
 	if sim == null:
 		return
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		request_quit()
+	elif what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		cancel_preview()
 		sensing = false
 		pruning = false
@@ -138,6 +202,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					cancel_preview()
 				else:
 					show_pause()
+			KEY_F5:
+				save_progress(true)
 			KEY_HOME:
 				world.camera = service.state.nodes.get(selected_node, service.state.nodes[1]).pos
 			KEY_TAB:
@@ -237,6 +303,7 @@ func finish_command() -> void:
 		cancel_preview()
 		return
 	command_serial += 1
+	var old_income: float = sim.metrics.ordinary_income
 	var result: Dictionary = service.commit(proposal, "%d-%d" % [Time.get_ticks_usec(), command_serial])
 	if result.ok:
 		sim.metrics = service.metrics()
@@ -254,6 +321,9 @@ func finish_command() -> void:
 		else:
 			hud.set_message(objective())
 		world.ensure_visible(service.state.nodes[selected_node].pos)
+		commands_since_save += 1
+		if result.kind == "rescue" or commands_since_save >= 10 or (old_income < 0.05 and sim.metrics.ordinary_income >= 0.05):
+			save_progress()
 	else:
 		hud.set_message(result.reason)
 	cancel_preview()
@@ -280,6 +350,8 @@ func resume_game() -> void:
 	if sim.needs_rescue:
 		sim.acknowledge_rescue_hint()
 	sim.set_frozen("menu", false)
+	sim.set_frozen("ending", false)
+	ending_elapsed = -1.0
 
 
 func show_rescue() -> void:
@@ -320,3 +392,58 @@ func _cycle_selection() -> void:
 	selected_edge = hits[index].get("edge", 0)
 	if selected_tool in ["leaf", "reinforce"]:
 		select_tool(selected_tool)
+
+
+func return_to_title() -> void:
+	var saved: Dictionary = save_progress()
+	if not saved.ok:
+		return
+	cancel_preview()
+	started = false
+	ending_elapsed = -1.0
+	sim.set_frozen("ending", false)
+	sim.set_frozen("menu", true)
+	load_status = saves.load_latest()
+	hud.show_title()
+
+
+func _begin_ending() -> void:
+	_victory_shown = true
+	cancel_preview()
+	sim.set_frozen("ending", true)
+	ending_elapsed = 0.0
+	_ending_from_camera = world.camera
+	_ending_from_scale = world.unit_scale
+	_ending_target = world.growth_framing()
+	save_progress()
+
+
+func _present_events() -> void:
+	var events: Array = service.state.events
+	for index in range(_events_seen, events.size()):
+		var event: Dictionary = events[index]
+		if event.type == "memory":
+			memory_remaining = event.duration
+			sim.set_frozen("memory", true)
+			hud.set_message(event.text)
+			save_progress()
+		elif event.type == "teaching" and memory_remaining <= 0.0:
+			hud.set_message(event.text)
+	_events_seen = events.size()
+
+
+func _update_presentation(delta: float) -> void:
+	if memory_remaining > 0.0:
+		memory_remaining = maxf(0.0, memory_remaining - delta)
+		if memory_remaining <= 0.0:
+			sim.set_frozen("memory", false)
+			hud.set_message(objective())
+	if ending_elapsed >= 0.0 and ending_elapsed < 2.0:
+		ending_elapsed = minf(2.0, ending_elapsed + delta)
+		var fraction: float = ending_elapsed / 2.0
+		var eased: float = fraction * fraction * (3.0 - 2.0 * fraction)
+		world.camera = _ending_from_camera.lerp(_ending_target.camera, eased)
+		world.unit_scale = lerpf(_ending_from_scale, _ending_target.scale, eased)
+		if ending_elapsed >= 2.0:
+			sim.set_frozen("menu", true)
+			hud.show_victory()

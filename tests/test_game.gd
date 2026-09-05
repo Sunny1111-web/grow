@@ -7,6 +7,11 @@ func run(t) -> void:
 	if not scene.has_method("start_new_game"):
 		scene.free()
 		return
+	t.check(scene.has_method("continue_game"), "Game offers continue from immutable save")
+	if not scene.has_method("continue_game"):
+		scene.free()
+		return
+	scene.save_directory = "res://test-results/ui-saves-%d" % Time.get_ticks_usec()
 	t.root.add_child(scene)
 	scene.start_new_game()
 	t.check(scene.service.state.nodes.size() == 1, "New game creates single seed")
@@ -33,6 +38,14 @@ func run(t) -> void:
 	scene.resume_game()
 	t.check(not scene.sim.frozen.has("menu"), "Resume removes only menu freeze")
 	t.check(not scene.sim.frozen.has("sense"), "Releasing sense during menu cannot trap game paused")
+	var saved_energy: float = scene.service.state.energy
+	var saved_edges: int = scene.service.state.edges.size()
+	t.check(scene.save_progress().ok, "Player can save current boundary")
+	scene.service.state.energy = 0.0
+	scene.continue_game()
+	t.near(scene.service.state.energy, saved_energy, 0.0001, "Continue restores saved energy")
+	t.check(scene.service.state.edges.size() == saved_edges, "Continue restores same topology")
+	t.check(scene.sim.frozen.is_empty(), "Continue resumes after recomputing resources")
 	scene.free()
 
 

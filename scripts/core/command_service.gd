@@ -4,6 +4,7 @@ const Growth = preload("res://scripts/core/growth_solver.gd")
 const Water = preload("res://scripts/core/water_solver.gd")
 const Support = preload("res://scripts/core/support_solver.gd")
 const Light = preload("res://scripts/core/light_solver.gd")
+const Narrative = preload("res://scripts/core/narrative.gd")
 const Model = preload("res://scripts/core/plant_state.gd")
 
 var state
@@ -77,6 +78,7 @@ func commit(proposal: Dictionary, command_id: String) -> Dictionary:
 		"cost": proposal.cost}
 	state.events.append({"type": "command", "command_id": command_id, "tick": state.tick,
 		"result": result.duplicate(true)})
+	Narrative.evaluate(state, metrics(), env)
 	_committed[command_id] = result.duplicate(true)
 	return result
 

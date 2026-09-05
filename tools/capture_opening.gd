@@ -11,6 +11,7 @@ func _init() -> void:
 
 func _play() -> void:
 	var game = load("res://scenes/main.tscn").instantiate()
+	game.save_directory = "res://test-results/opening-saves-%d" % Time.get_ticks_usec()
 	root.add_child(game)
 	game.start_new_game()
 	var driver = load("res://tests/test_game.gd").new()

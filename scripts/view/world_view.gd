@@ -140,6 +140,8 @@ func _draw() -> void:
 		elif game.selected_tool in ["root", "vine", "leaf"]:
 			draw_circle(position, 3.5, Color(BUD, 0.65))
 	_preview()
+	if game.memory_remaining > 0.0:
+		_memory_glow()
 
 
 func _background() -> void:
@@ -297,3 +299,25 @@ func _polygon(points: Array, color: Color) -> void:
 	for point in points:
 		screen.append(to_screen(point))
 	draw_colored_polygon(screen, color)
+
+
+func growth_framing() -> Dictionary:
+	var low: Vector2 = Vector2(1.0, -2.8)
+	var high: Vector2 = Vector2(20.0, 7.5)
+	for node in game.service.state.nodes.values():
+		low = low.min(node.pos - Vector2(0.5, 0.5))
+		high = high.max(node.pos + Vector2(0.5, 0.5))
+	var available: Vector2 = get_viewport_rect().size - Vector2(150, 320)
+	var scale: float = clampf(minf(available.x / (high.x - low.x), available.y / (high.y - low.y)), 40.0, 90.0)
+	return {"camera": (low + high) * 0.5 + Vector2(0, -20.0 / scale), "scale": scale}
+
+
+func _memory_glow() -> void:
+	var fade: float = minf(1.0, game.memory_remaining) * minf(1.0, (5.0 - game.memory_remaining) * 2.0)
+	var position: Vector2 = game.service.env.memory_position
+	for ring in range(8, 0, -1):
+		draw_circle(to_screen(position + Vector2(0, 0.3)), unit_scale * ring * 0.14, Color(LIGHT, 0.018 * fade))
+	for drop in range(3):
+		var phase: float = fmod((5.0 - game.memory_remaining) * 0.8 + drop * 0.3, 1.0)
+		var point: Vector2 = position + Vector2(0.6 + phase * 0.2, 0.5 - phase * 0.45)
+		draw_circle(to_screen(point), unit_scale * 0.025, Color(WATER, fade * (1.0 - phase)))
