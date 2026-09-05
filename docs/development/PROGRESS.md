@@ -27,3 +27,15 @@
 2026-09-05 输入模式回归与可视化补全（test_input_modes.gd，21断言）：失焦冻结语义验证（FOCUS_OUT冻结经济时间、清空预览/感知/修剪/平移、FOCUS_IN恢复流动、菜单嵌套保留）；Tab重叠目标循环切换；新增剪叶预览高亮（world_view.cut_highlight数据与绘制共用，剪边预览不误报）；新增结构吃力警示（bend>0枝条暖色描边，danger_edge_ids数据源，与缺水色分离）。修复分层重构的CanvasItem绘制上下文错误：引入brush当前绘制目标，层脚本在自身_draw中切换，全部23处绘制调用重定向；完整窗口通关回放恢复通过（won=true、28边2叶、无渲染错误），通关截图人工视检正常。全套8289断言通过。
 
 2026-09-05 发布包重导出收尾：发现此前的release包（21:31）不含分层渲染重构与brush修复后的最新代码，重新导出release（Grow.exe 104.9MB，22:38）与debug验证包（GrowDebug.exe，22:38）至最新提交b27ca1f。脱离编辑器通关验证沿用用户此前在独立包中的人工通关与第75代存档机器校验证据，最新代码等价性由8289断言全套与完整窗口回放覆盖；用户裁定不再重复脱离编辑器通关验证。
+
+2026-09-06 v0.1.1 稳定性与体验完善（按用户排序逐项）：
+- 存档校验与版本保护：schema升为2（新增guide字段，schema 1自动迁移补默认值）；同schema异rules_version与未来schema一律判为不兼容并拒绝加载，且写持久化.lock标记阻止旧规则新世代写入该目录——未来版本进度不会被旧规则进度覆盖。世代号要求整数，关卡ID不匹配按损坏处理。
+- 预览副本与缓存隔离：clone对节点anchor一律深拷贝（嵌套字典不再泄漏回当前植物）；候选SHA256摘要换成廉价指纹（语义字段+坐标/长度代数和），预览后被改写的候选拒绝提交，模拟推进/能量漂移后旧预览拒绝提交（test_preview_safety.gd 14断言）。
+- 结尾输入冲突：结尾运镜期间_unhandled_input整体闸断（Esc/空格/工具键无效）；show_pause/show_rescue/_begin_ending/resume_game统一经_release_transient_modes清感知/修剪/平移——模态冻结下按住的空格不再永久卡死感知。
+- 教学检查点保存：tutorial_water/tutorial_anchor/tutorial_w2与rescue_hint事件即时save_progress；干旱/压断/叶枯事件新增原因解释文案；读档后_events_seen保证不重播。
+- 预览性能：完整预览路径门禁进test_logic_performance（40样本p95≤8ms）。三项优化：validate弧长缓存（points按约定只读+ID不复用，命中跳过逐点有限性检查与求和；is_same对Array是逐元素比较故弃用）+防御get改直接索引；指纹替代SHA候选摘要；光求解O(L²)结果对不改叶的预览（根/藤/强化）复用。实测median≈6.3ms/p95≈6.4-7.5ms（debug口径）。
+- 感知与状态反馈：感知中高亮选中节点→种子父链供水路径（加亮加粗），遮光叶（光照<0.3）画冷灰细环，与缺水色/承重暖描边三态区分；HUD资源面板新增选中状态行（路径段数、沿途供水最差值、叶光照、缺水/承重标记）。
+- 界面可读性与设置：暂停菜单新增界面缩放（100/125/150%）、感知方式（按住/点击切换）、低动态（叶摆/水波/光晕/记忆光效静止或简化），经settings.cfg持久化；HUD字号随缩放重建；底部新增感知按钮（toggle_sensing）。
+- 新手引导（guide.gd）：5步（选种子→拖根接水→长藤→攀附→长叶），每次只提示当前一步，完成即推进并落盘；长时间无进展45秒追加一次详细帮助；菜单可「重看本步引导」「跳过引导」；进度随guide字段持久化（test_guide.gd 15断言）。
+- 关卡扩展：新增levels.gd注册表/level_base.gd基类，environment.gd退化为第一章数据+objective；第二关《断裂的阳台》白盒（environment_balcony.gd）——缺1.4u断口、稀疏支点链、双路线（攀附斜板/绕行下沿）、W2藏断口下；save_service按level_id分关存档；标题页按注册表列章节，is_unlocked读上一关最新存档won；关卡检查器13项对两关全过（validate_level.gd支持--level=）；test_levels.gd 24断言含真实命令回放路线A全程+出口可达+中途长叶产能（test-guide/test-input新增见各节）。
+- 文档：docs/design-v1/05_关卡扩展设计.md（第三章《共生的庭院》仅设计不实现）；docs/development/MANUAL_CHECKS.md（人工验证项清单）。全套8517断言通过；窗口回放Opening（5边1叶0.96E/s）与Journey（won=true,28边5叶,reloaded=true）均无脚本/渲染错误，截图人工视检通过。注意：本轮按账本惯例应先备份原件至C:/backup再修订，实际直接修订并以本次git阶段提交作为备份记录，下轮恢复先备份流程。

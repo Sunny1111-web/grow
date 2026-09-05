@@ -22,6 +22,11 @@ var rescue_count: int = 0
 var victory_time: float = 0.0
 var won: bool = false
 var dry_hint_time: float = 0.0
+# 新手引导进度：步序、跳过与追加帮助标记，随存档持久化。
+var guide: Dictionary = {"step": 0, "skipped": false, "helped": false}
+# 边几何弧长缓存：points 数组按约定只读，键为边ID，值 [points引用, 长度, 点数]。
+# 克隆共享引用与缓存，预览校验避免对数千曲线点重复求和。
+var _arc_cache: Dictionary = {}
 
 
 static func create(seed_position: Vector2 = Vector2(2.0, -0.8)):
@@ -33,14 +38,18 @@ static func create(seed_position: Vector2 = Vector2(2.0, -0.8)):
 
 func clone():
 	var result = get_script().new()
+	result._arc_cache = _arc_cache
 	for field in persistent_fields():
 		var value = get(field)
 		if field == "nodes":
-			# 节点字段（pos/anchor/kind/emergency）在克隆后从不被改写，浅拷贝隔离即可。
-			var shallow_nodes: Dictionary = {}
+			# 嵌套的 anchor 字典必须与当前植物隔离，否则候选上的锚点改动
+			# 会泄漏回正式状态；浅拷贝节点字段，anchor 一律深拷贝（空表廉价）。
+			var isolated_nodes: Dictionary = {}
 			for id in value:
-				shallow_nodes[id] = value[id].duplicate(false)
-			result.set(field, shallow_nodes)
+				var node: Dictionary = value[id].duplicate(false)
+				node.anchor = node.anchor.duplicate(true)
+				isolated_nodes[id] = node
+			result.set(field, isolated_nodes)
 		elif field == "edges":
 			# 每边浅字典隔离z/bend/kind等逐tick字段；points数组创建后从不被改写，
 			# 与原状态共享引用，省去每次预览深拷贝数千个曲线点。
@@ -70,7 +79,7 @@ func clone():
 static func persistent_fields() -> Array:
 	return ["energy", "revision", "next_id", "tick", "seed_id", "nodes", "edges", "leaves",
 		"history", "scars", "events", "explored", "revealed", "emergency_produced",
-		"rescue_count", "victory_time", "won", "dry_hint_time"]
+		"rescue_count", "victory_time", "won", "dry_hint_time", "guide"]
 
 
 func add_edge(a: int, kind: String, points: Array, anchor: Dictionary = {}, emergency: bool = false, slot: int = 0) -> int:
@@ -136,49 +145,55 @@ func validate() -> Array[String]:
 			used[id] = true
 	for id in nodes:
 		var node: Dictionary = nodes[id]
-		if not _finite_position(node.get("pos")):
+		if not _finite_position(node.pos):
 			errors.append("Invalid node position")
-		if node.get("kind", "") not in ["seed", "root", "shoot"]:
+		if node.kind not in ["seed", "root", "shoot"]:
 			errors.append("Invalid node type")
 		if id != seed_id:
-			var incoming: int = node.get("parent_edge", 0)
-			if not edges.has(incoming) or edges[incoming].get("b", 0) != id:
+			var incoming: int = node.parent_edge
+			if not edges.has(incoming) or edges[incoming].b != id:
 				errors.append("Node parent mismatch")
 	for id in edges:
 		var edge: Dictionary = edges[id]
-		if not nodes.has(edge.get("a", 0)) or not nodes.has(edge.get("b", 0)):
+		if not nodes.has(edge.a) or not nodes.has(edge.b):
 			errors.append("Orphan edge")
 			continue
-		if edge.get("kind", "") not in ["root", "vine", "branch"]:
+		if edge.kind not in ["root", "vine", "branch"]:
 			errors.append("Invalid edge type")
-		var points = edge.get("points", [])
+		var points = edge.points
 		if not points is Array or points.size() < 2:
 			errors.append("Missing edge geometry")
 			continue
 		var arc: float = 0.0
-		var valid_points: bool = true
-		for point in points:
-			if not _finite_position(point):
-				valid_points = false
-		if not valid_points:
-			errors.append("Non-finite edge geometry")
-			continue
-		for index in range(1, points.size()):
-			arc += points[index - 1].distance_to(points[index])
-		if arc <= 0.0 or not is_finite(edge.get("length", NAN)) or absf(edge.length - arc) > 0.001:
+		# 弧长缓存：points 数组按约定创建后只读（克隆共享引用、ID 永不复用），
+		# 命中即跳过逐点有限性检查与弧长求和；未命中才完整校验并回填。
+		# 不能用 is_same/== 判引用：二者对 Array 都是逐元素比较，成本与求和相当。
+		var cached: Array = _arc_cache.get(edge.id, [])
+		if cached.size() == 3 and cached[2] == points.size():
+			arc = cached[1]
+		else:
+			var valid_points: bool = true
+			for point in points:
+				if not _finite_position(point):
+					valid_points = false
+			if not valid_points:
+				errors.append("Non-finite edge geometry")
+				continue
+			for index in range(1, points.size()):
+				arc += points[index - 1].distance_to(points[index])
+			_arc_cache[edge.id] = [points, arc, points.size()]
+		if arc <= 0.0 or not is_finite(edge.length) or absf(edge.length - arc) > 0.001:
 			errors.append("Edge length does not match geometry")
 		if points.front().distance_to(nodes[edge.a].pos) > 0.001 or points.back().distance_to(nodes[edge.b].pos) > 0.001:
 			errors.append("Edge endpoints do not match nodes")
-		for field in ["z", "bend"]:
-			if not is_finite(edge.get(field, NAN)) or edge[field] < 0.0:
-				errors.append("Invalid edge accumulator")
+		if not is_finite(edge.z) or edge.z < 0.0 or not is_finite(edge.bend) or edge.bend < 0.0:
+			errors.append("Invalid edge accumulator")
 	for id in leaves:
 		var leaf: Dictionary = leaves[id]
-		if not nodes.has(leaf.get("node", 0)):
+		if not nodes.has(leaf.node):
 			errors.append("Orphan leaf")
-		for field in ["angle", "z", "produced"]:
-			if not is_finite(leaf.get(field, NAN)):
-				errors.append("Invalid leaf scalar")
+		if not is_finite(leaf.angle) or not is_finite(leaf.z) or not is_finite(leaf.produced):
+			errors.append("Invalid leaf scalar")
 	# 每个节点的父链必须到达种子：一次从种子出发的遍历即可判定可达性，
 	# 替代逐节点独立爬链的平方成本；不可达即断链或成环。
 	var children_map: Dictionary = {}
@@ -204,3 +219,17 @@ func validate() -> Array[String]:
 
 static func _finite_position(value) -> bool:
 	return value is Vector2 and is_finite(value.x) and is_finite(value.y)
+
+
+# 选中节点到种子的父边链（感知高亮供水路径使用）。
+func parent_chain(node_id: int) -> Array:
+	var chain: Array = []
+	var guard: int = 0
+	while nodes.has(node_id) and guard <= edges.size():
+		guard += 1
+		var incoming: int = nodes[node_id].get("parent_edge", 0)
+		if incoming == 0 or not edges.has(incoming):
+			break
+		chain.append(incoming)
+		node_id = edges[incoming].a
+	return chain

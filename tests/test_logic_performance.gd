@@ -13,6 +13,7 @@ func run(t) -> void:
 	_steady_step(t)
 	_full_solve(t)
 	_cache_reuse(t)
+	_preview_path(t)
 
 
 # 400活边、100活叶且两根接入W1的压力株。链条按(0.01,0.01)延伸，
@@ -96,3 +97,40 @@ func _cache_reuse(t) -> void:
 		"缓存返回相同的水量与结构风险")
 	t.near(second.income, first.income, 0.0000001, "缓存返回相同产能")
 	print("METRICS_CACHE_PERFORMANCE us=%d" % elapsed)
+
+
+# 完整预览路径：clone→候选全量求解→validate→指纹。与 TDD
+# 「完整预览 p95≤8ms」同一压力工作集；修正采样口径：在测试内对
+# 真实 service.preview 采样（与编辑器 debug 同口径），不再依赖
+# 导出包内的人工采集。压力株已满100叶上限，故用强化预览采样
+# （覆盖 clone+全量求解+validate+指纹，与生长预览同路径）。
+func _preview_path(t) -> void:
+	var built: Array = _stress_plant()
+	var service = built[0]
+	var state = built[1]
+	service.metrics()
+	var vines: Array = []
+	for edge in state.edges.values():
+		if edge.kind == "vine":
+			vines.append(edge.id)
+	t.check(vines.size() >= 24, "压力株存在足够的可强化藤")
+	var warm: Dictionary = service.preview("reinforce", vines[0])
+	t.check(warm.ok, "预览预热成功: " + str(warm.get("reason", "")))
+	for index in range(6):
+		service.preview("reinforce", vines[index])
+	var samples: Array[int] = []
+	for index in range(40):
+		var target: int = vines[index % vines.size()]
+		var begin: int = Time.get_ticks_usec()
+		var proposal: Dictionary = service.preview("reinforce", target)
+		samples.append(Time.get_ticks_usec() - begin)
+		t.check(proposal.ok, "预览样本%d成功" % index)
+		t.check(proposal.metrics.water.organs.size() == state.edges.size() + state.leaves.size(),
+			"预览指标覆盖候选全部器官")
+		t.check(proposal.candidate.edges[target].kind == "branch", "预览候选完成强化改写")
+	samples.sort()
+	var p95: int = samples[ceili(samples.size() * 0.95) - 1]
+	t.check(p95 <= FULL_SOLVE_BUDGET_US, "完整预览路径p95≤8ms；actual=%dus median=%dus max=%dus" %
+		[p95, samples[samples.size() / 2], samples[-1]])
+	print("PREVIEW_PATH_PERFORMANCE samples=%d median_us=%d p95_us=%d max_us=%d" %
+		[samples.size(), samples[samples.size() / 2], p95, samples[-1]])

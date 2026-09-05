@@ -5,13 +5,16 @@ const Level = preload("res://scripts/core/environment.gd")
 const Commands = preload("res://scripts/core/command_service.gd")
 const Saves = preload("res://scripts/core/save_service.gd")
 const Simulation = preload("res://scripts/core/simulation.gd")
+const Levels = preload("res://scripts/core/levels.gd")
+const Guide = preload("res://scripts/core/guide.gd")
 const World = preload("res://scripts/view/world_view.gd")
 const Hud = preload("res://scripts/view/hud.gd")
 const GameAudio = preload("res://scripts/view/audio.gd")
 
 var service
 var saves
-var save_directory: String = "user://saves/chapter1"
+var level_id: String = Levels.APARTMENT
+var save_directory: String = Levels.save_dir_for(Levels.APARTMENT)
 var load_status: Dictionary = {}
 var commands_since_save: int = 0
 var sim
@@ -43,6 +46,16 @@ var _ending_target: Dictionary = {}
 var _capture_path: String = ""
 var _capture_frames: int = 0
 var _history_merged_announced: bool = false
+# 引导与消息优先级：事件/引导文案持有期间，低优先级文案不覆盖。
+var guide_message: String = ""
+var guide_active: bool = false
+var message_hold: float = 0.0
+var idle_time: float = 0.0
+var _guide_helped: bool = false
+# 设置（经 audio 的 ConfigFile 持久化）：界面缩放、感知切换、低动态。
+var ui_scale: float = 1.0
+var sensing_toggle: bool = false
+var low_motion: bool = false
 
 
 func _ready() -> void:
@@ -52,7 +65,10 @@ func _ready() -> void:
 			_capture_path = argument.trim_prefix("--capture=")
 	if _capture_path != "":
 		save_directory = "res://test-results/capture-saves-%d" % Time.get_ticks_usec()
-	saves = Saves.new(save_directory)
+	audio = GameAudio.new()
+	add_child(audio)
+	_load_game_settings()
+	saves = Saves.new(save_directory, level_id)
 	load_status = saves.load_latest()
 	service = Commands.new(Model.create(), Level.new())
 	sim = Simulation.new(service)
@@ -62,8 +78,6 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.game = self
 	add_child(hud)
-	audio = GameAudio.new()
-	add_child(audio)
 	sim.set_frozen("menu", true)
 	hud.show_title()
 	for argument in OS.get_cmdline_user_args():
@@ -73,18 +87,68 @@ func _ready() -> void:
 			start_new_game()
 
 
-func start_new_game() -> void:
-	_activate_state(Model.create())
+func _load_game_settings() -> void:
+	ui_scale = clampf(audio.setting("ui", "ui_scale", 1.0), 1.0, 1.6)
+	sensing_toggle = audio.setting("ui", "sensing_toggle", false)
+	low_motion = audio.setting("ui", "low_motion", false)
+
+
+func set_ui_scale(value: float) -> void:
+	ui_scale = clampf(value, 1.0, 1.6)
+	audio.set_setting("ui", "ui_scale", ui_scale)
+	hud.apply_settings()
+
+
+func set_sensing_toggle(enabled: bool) -> void:
+	sensing_toggle = enabled
+	audio.set_setting("ui", "sensing_toggle", enabled)
+
+
+func set_low_motion(enabled: bool) -> void:
+	low_motion = enabled
+	audio.set_setting("ui", "low_motion", enabled)
+
+
+func start_new_game(target_level: String = "") -> void:
+	if target_level != "" and target_level != level_id:
+		_switch_level(target_level, true)
+		return
+	_activate_state(Model.create(), Level.new())
 	hud.set_message("从种子向下拖出两段根，寻找裂缝深处的水。按住空格感知湿润方向。")
+	message_hold = 6.0
 	save_progress()
 
 
-func continue_game() -> void:
+func continue_game(target_level: String = "") -> void:
+	if target_level != "" and target_level != level_id:
+		_switch_level(target_level, false)
+		return
 	load_status = saves.load_latest()
 	if not load_status.ok:
 		hud.set_message(load_status.reason)
 		return
-	_activate_state(load_status.state)
+	_activate_state(load_status.state, service.env)
+	hud.set_message(load_status.reason if load_status.recovered else objective())
+
+
+# 章节切换：重建存档服务与环境；续档失败时回到标题并给出原因。
+func _switch_level(target_level: String, fresh: bool) -> void:
+	if not Levels.is_unlocked(target_level):
+		hud.set_message("先完成前一关，才能进入新的章节。")
+		return
+	level_id = target_level
+	save_directory = Levels.save_dir_for(level_id)
+	if _capture_path != "":
+		save_directory = "res://test-results/capture-saves-%d" % Time.get_ticks_usec()
+	saves = Saves.new(save_directory, level_id)
+	load_status = saves.load_latest()
+	var env = Levels.env_for(level_id)
+	if fresh or not load_status.ok:
+		if not fresh:
+			hud.set_message(load_status.reason)
+		start_new_game()
+		return
+	_activate_state(load_status.state, env)
 	hud.set_message(load_status.reason if load_status.recovered else objective())
 
 
@@ -95,8 +159,8 @@ func notice_history_merged(batched_count: int) -> void:
 	hud.set_message("旧痕迹已合并显示；%d 段历史仍完整保留在档案中。" % batched_count)
 
 
-func _activate_state(plant) -> void:
-	service = Commands.new(plant, Level.new())
+func _activate_state(plant, env = null) -> void:
+	service = Commands.new(plant, env if env != null else Levels.env_for(level_id))
 	sim = Simulation.new(service)
 	selected_node = 1
 	selected_edge = 0
@@ -115,6 +179,11 @@ func _activate_state(plant) -> void:
 	ending_elapsed = -1.0
 	_events_seen = plant.events.size()
 	_history_merged_announced = false
+	message_hold = 0.0
+	guide_message = ""
+	guide_active = false
+	_guide_helped = false
+	idle_time = 0.0
 	world.camera = Vector2(6.5, 1.0)
 	world.unit_scale = 80.0
 	if plant.won:
@@ -146,6 +215,7 @@ func request_quit() -> void:
 func _process(delta: float) -> void:
 	if sim == null:
 		return
+	message_hold = maxf(0.0, message_hold - delta)
 	if animation_remaining > 0.0:
 		animation_remaining = maxf(0.0, animation_remaining - delta)
 		sim.set_frozen("animation", animation_remaining > 0.0)
@@ -156,7 +226,10 @@ func _process(delta: float) -> void:
 			show_rescue()
 		if service.state.won and not _victory_shown:
 			_begin_ending()
+	_update_guide(delta)
 	_present_events()
+	if guide_active and message_hold <= 0.0 and guide_message != "":
+		hud.set_message(guide_message)
 	_update_presentation(delta)
 	hud.refresh()
 	world.queue_redraw()
@@ -164,6 +237,27 @@ func _process(delta: float) -> void:
 		_capture_frames += 1
 		if _capture_frames == 8:
 			_capture.call_deferred()
+
+
+# 引导文案与「长时间无进展」的追加帮助。事件文案持有期不覆盖。
+func _update_guide(delta: float) -> void:
+	if not started or sim.frozen.has("menu"):
+		return
+	var result: Dictionary = Guide.evaluate(self)
+	guide_active = result.active
+	guide_message = result.message
+	_guide_helped = service.state.guide.get("helped", false)
+	if guide_active:
+		idle_time += delta
+		if idle_time >= Guide.IDLE_HELP_SECONDS and not _guide_helped:
+			var help: String = Guide.request_help(self)
+			if help != "":
+				guide_message = guide_message + "\n" + help
+				message_hold = 8.0
+				hud.set_message(guide_message)
+	elif not guide_message.is_empty() or idle_time > 0.0:
+		guide_message = ""
+		idle_time = 0.0
 
 
 func _capture() -> void:
@@ -193,10 +287,19 @@ func _notification(what: int) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not started or sim.frozen.has("menu"):
 		return
+	# 结尾运镜期间不接受任何交互输入：避免 Esc/空格打断或遗留冻结。
+	if ending_elapsed >= 0.0:
+		return
 	if event is InputEventKey:
 		if event.keycode == KEY_SPACE:
-			sensing = event.pressed
-			sim.set_frozen("sense", sensing)
+			if event.echo:
+				return
+			if sensing_toggle:
+				if event.pressed:
+					toggle_sensing()
+			else:
+				sensing = event.pressed
+				sim.set_frozen("sense", sensing)
 			return
 		if event.keycode == KEY_SHIFT:
 			pruning = event.pressed
@@ -316,6 +419,7 @@ func finish_command() -> void:
 		cancel_preview()
 		return
 	command_serial += 1
+	idle_time = 0.0
 	var old_income: float = sim.metrics.ordinary_income
 	var result: Dictionary = service.commit(proposal, "%d-%d" % [Time.get_ticks_usec(), command_serial])
 	if result.ok:
@@ -358,17 +462,24 @@ func cancel_preview() -> void:
 	sim.set_frozen("preview", false)
 
 
+# 感知模式的切换形态（设置里可选）：按住空格 或 点击/空格切换。
+func toggle_sensing() -> void:
+	sensing = not sensing
+	sim.set_frozen("sense", sensing)
+	if not sensing:
+		world.queue_redraw()
+
+
 func show_pause() -> void:
 	cancel_preview()
-	sensing = false
-	pruning = false
-	sim.set_frozen("sense", false)
+	_release_transient_modes()
 	sim.set_frozen("menu", true)
 	hud.show_pause()
 
 
 func resume_game() -> void:
 	hud.close_modal()
+	_release_transient_modes()
 	if sim.needs_rescue:
 		sim.acknowledge_rescue_hint()
 	sim.set_frozen("menu", false)
@@ -378,8 +489,35 @@ func resume_game() -> void:
 
 func show_rescue() -> void:
 	cancel_preview()
+	_release_transient_modes()
 	sim.set_frozen("menu", true)
 	hud.show_rescue()
+
+
+# 打开任何模态前清掉感知/修剪等瞬态模式：
+# 按住的空格在模态冻结下收不到释放事件，否则会永久卡在感知暂停。
+func _release_transient_modes() -> void:
+	sensing = false
+	pruning = false
+	panning = false
+	dragging = false
+	sim.set_frozen("sense", false)
+
+
+func replay_guide_hint() -> void:
+	resume_game()
+	var message: String = Guide.replay_message(self)
+	message_hold = 8.0
+	hud.set_message(message)
+
+
+func skip_guide() -> void:
+	Guide.skip(self)
+	guide_active = false
+	guide_message = ""
+	resume_game()
+	hud.set_message("已跳过引导。随时可在菜单里重看提示。")
+	message_hold = 6.0
 
 
 func confirm_rescue() -> void:
@@ -393,13 +531,10 @@ func selected_cost() -> float:
 
 
 func objective() -> String:
-	if service.env.water_contacts(service.state).is_empty():
-		return "先让根接到水。空格感知方向，选种子后向下拖出根。"
-	if sim.metrics.get("ordinary_income", 0.0) < 0.05:
-		return "选回种子，按 2 长藤：向上穿过裂缝，再向右攀上椅座；按 3 长叶。"
-	if service.state.won:
-		return "你留下的每一道枝与伤痕，都成为通往光的路径。"
-	return "沿椅子、桌沿和管道寻找支点。向右上方的窗外生长，必要时强化或修剪。"
+	var text: String = service.env.objective(service.state, sim.metrics)
+	if text != "":
+		return text
+	return "让这株植物继续生长。"
 
 
 func _cycle_selection() -> void:
@@ -433,6 +568,7 @@ func _begin_ending() -> void:
 	_victory_shown = true
 	audio.play("victory")
 	cancel_preview()
+	_release_transient_modes()
 	sim.set_frozen("ending", true)
 	ending_elapsed = 0.0
 	_ending_from_camera = world.camera
@@ -449,14 +585,36 @@ func _present_events() -> void:
 			memory_remaining = event.duration
 			sim.set_frozen("memory", true)
 			hud.set_message(event.text)
+			message_hold = 6.0
 			save_progress()
 		elif event.type == "teaching" and memory_remaining <= 0.0:
 			hud.set_message(event.text)
+			message_hold = 7.0
 			if event.get("id", "") == "tutorial_water":
 				audio.play("water")
+			# 教学检查点：接水、首次攀附、W2 后立即落盘，读档后不重播也不丢进度。
+			if event.get("id", "") in ["tutorial_water", "tutorial_anchor", "tutorial_w2"]:
+				save_progress()
+		elif event.type == "rescue_hint":
+			# 危机提示本身是检查点：把干渴计时与提示状态存下来。
+			message_hold = 7.0
+			save_progress()
 		elif event.type in ["drought", "overload", "leaf_drought"]:
 			audio.play("snap")
+			message_hold = 6.0
+			_explain_crisis(event)
 	_events_seen = events.size()
+
+
+# 危机解释：真实缺水或承重断裂发生时，讲清原因而不是只报事件名。
+func _explain_crisis(event: Dictionary) -> void:
+	match event.type:
+		"drought":
+			hud.set_message("一段枝干渴枯萎了：它的供水 r 降到 0 以下太久。修剪低效支路，或把根接向更近的水源。")
+		"overload":
+			hud.set_message("一段藤被自身重量压断了：悬空负载超过承受极限。强化成枝（4）或先攀上支点再伸展。")
+		"leaf_drought":
+			hud.set_message("一片叶干枯脱落了：水分没有送到这里。前方路径的耗水可能大于供给。")
 
 
 func _update_presentation(delta: float) -> void:

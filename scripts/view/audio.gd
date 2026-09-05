@@ -7,6 +7,7 @@ var settings_path: String = "user://settings.cfg"
 var muted_debug_log: bool = false
 var played_log: Array = []
 var _volumes: Dictionary = {"Master": 1.0, "Ambience": 1.0, "SFX": 1.0}
+var _extra: Dictionary = {}
 var _ambient_player: AudioStreamPlayer = null
 
 
@@ -77,6 +78,9 @@ func save_settings() -> bool:
 	var config := ConfigFile.new()
 	for bus_name in BUSES:
 		config.set_value("audio", bus_name, volume(bus_name))
+	for key in ["ui_scale", "sensing_toggle", "low_motion"]:
+		if _extra.has(key):
+			config.set_value("ui", key, _extra[key])
 	return config.save(settings_path) == OK
 
 
@@ -86,3 +90,19 @@ func load_settings() -> void:
 		return
 	for bus_name in BUSES:
 		set_volume(bus_name, float(config.get_value("audio", bus_name, 1.0)))
+	for key in ["ui_scale", "sensing_toggle", "low_motion"]:
+		if config.has_section_key("ui", key):
+			_extra[key] = config.get_value("ui", key)
+
+
+# 通用界面设置存取：与音量共用 settings.cfg。
+func set_setting(section: String, key: String, value) -> void:
+	if section == "ui":
+		_extra[key] = value
+	save_settings()
+
+
+func setting(section: String, key: String, default_value):
+	if section == "ui" and _extra.has(key):
+		return _extra[key]
+	return default_value

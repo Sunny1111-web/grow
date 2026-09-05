@@ -68,7 +68,13 @@ static func _with_endpoint(start: Vector2, tangent: Vector2, aim: Vector2, end: 
 	var high: float = length * 0.9
 	var points: Array = _sample(start, start + tangent * high, end - aim * high, end)
 	if _length(points) < length:
-		return []
+		# 弦长接近段长时首样可能差一点点：延长把手上限再搜一次，
+		# 让贴附支点的临界吸附（如阳台栏杆）成立；原有成功路径不受影响。
+		low = high
+		high = length * 1.35
+		points = _sample(start, start + tangent * high, end - aim * high, end)
+		if _length(points) < length:
+			return []
 	for _iteration in range(18):
 		var handle: float = (low + high) * 0.5
 		points = _sample(start, start + tangent * handle, end - aim * handle, end)

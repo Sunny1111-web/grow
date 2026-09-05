@@ -161,6 +161,7 @@ func _draw_scars(state) -> void:
 
 
 func _draw_plant(state) -> void:
+	var selection_path: Array = _selection_path_ids(state)
 	for edge in state.edges.values():
 		var points: Array = edge.points
 		if edge.id == game.growing_edge and game.animation_remaining > 0.0:
@@ -188,12 +189,51 @@ func _draw_plant(state) -> void:
 		if game.sensing and game.sim.metrics.water.organs.has(edge.id):
 			var ratio: float = game.sim.metrics.water.organs[edge.id].r
 			_polyline(points, Color(WATER, 0.75 * ratio), 0.018)
+			# 选中供水路径：从选中节点到种子的父链加亮加粗，一眼可辨。
+			if edge.id in selection_path:
+				_polyline(points, Color(WATER, 0.95), 0.038)
 	for leaf in state.leaves.values():
 		var position: Vector2 = state.nodes[leaf.node].pos
 		if leaf.emergency:
 			position += Vector2(0, 0.15)
-		var wave: float = sin(Time.get_ticks_msec() * 0.0016 + leaf.id) * 0.025
+		var wave: float = leaf_wave(leaf.id)
 		_leaf(position, leaf.angle + wave, leaf.z, 0.45 if leaf.emergency and leaf.produced >= 18.0 else 1.0)
+		# 遮光标记：感知中给光照不足的普通叶画一圈冷灰细环，与缺水/承重区分。
+		if game.sensing and not leaf.emergency and game.sim.metrics.light.has(leaf.id):
+			if game.sim.metrics.light[leaf.id].light < 0.3:
+				brush.draw_arc(to_screen(position + Vector2.from_angle(leaf.angle) * 0.16),
+					unit_scale * 0.3, 0, TAU, 24, Color(0.62, 0.68, 0.72, 0.85), 1.5, true)
+
+
+# 叶片摆动幅度：低动态设置下归零，感知/预览等暂停时也不摆动。
+func leaf_wave(leaf_id: int) -> float:
+	if game.low_motion:
+		return 0.0
+	return sin(Time.get_ticks_msec() * 0.0016 + leaf_id) * 0.025
+
+
+# 选中节点到种子的父边链（感知高亮供水路径的数据源，与绘制共用）。
+func _selection_path_ids(state) -> Array:
+	if not game.sensing or not state.nodes.has(game.selected_node):
+		return []
+	return state.parent_chain(game.selected_node)
+
+
+func selection_path_ids() -> Array:
+	return _selection_path_ids(game.service.state)
+
+
+# 遮光叶清单：普通叶光照 < 0.3，供测试与绘制共用。
+func shaded_leaf_ids() -> Array:
+	var result: Array = []
+	if not game.sensing:
+		return result
+	for leaf in game.service.state.leaves.values():
+		if leaf.emergency:
+			continue
+		if game.sim.metrics.light.has(leaf.id) and game.sim.metrics.light[leaf.id].light < 0.3:
+			result.append(leaf.id)
+	return result
 
 
 func _draw_water_waves(state) -> void:
@@ -202,7 +242,7 @@ func _draw_water_waves(state) -> void:
 			var center: Vector2 = water.rect.get_center()
 			var phase: float = Time.get_ticks_msec() * 0.002
 			for wave in range(3):
-				var sway: float = sin(phase + wave * 2.1) * 0.045
+				var sway: float = 0.0 if game.low_motion else sin(phase + wave * 2.1) * 0.045
 				_line(center + Vector2(-0.2 + sway, wave * 0.08 - 0.08),
 					center + Vector2(0.2 - sway, wave * 0.08 - 0.07), Color(WATER, 0.22), 0.014)
 
@@ -226,13 +266,17 @@ func _draw_selection() -> void:
 			brush.draw_circle(position, 3.5, Color(BUD, 0.65))
 
 
-# 常态氛围层（背景层调用）：光区径向光晕，纯叠加绘制；水波在植物层10Hz重绘。
+# 常态氛围层（背景层调用）：光区径向光晕，纯叠加绘制；低动态时单圈淡光。
 func _atmosphere(state) -> void:
 	for fixture in game.service.env.lights:
 		if fixture.id == "ambient" or fixture.intensity < 0.3:
 			continue
 		var center: Vector2 = fixture.rect.get_center()
 		var radius: float = maxf(fixture.rect.size.x, fixture.rect.size.y) * 0.5
+		if game.low_motion:
+			brush.draw_circle(to_screen(center), unit_scale * radius,
+				Color(LIGHT, 0.03 * fixture.intensity))
+			continue
 		for ring in range(6, 0, -1):
 			brush.draw_circle(to_screen(center), unit_scale * radius * ring / 6.0,
 				Color(LIGHT, 0.011 * fixture.intensity * (7 - ring)))
@@ -247,7 +291,66 @@ func _update_history_slots(state) -> void:
 		game.notice_history_merged(_slots_cache.batched_count)
 
 
+# 背景按关卡分派：第一关保留原空房间装饰，其余关卡走通用白盒绘制。
 func _background() -> void:
+	if game.service.env.level_id == "apartment":
+		_background_apartment()
+	else:
+		_background_generic()
+	_draw_obstacles_and_waters()
+
+
+func _background_generic() -> void:
+	brush.draw_rect(get_viewport_rect(), Color("1a2530"))
+	var env = game.service.env
+	# 天空渐变（白盒用纯色分层表示）。
+	var sky: Rect2 = Rect2(env.bounds.position.x, env.bounds.position.y + 4.4, env.bounds.size.x, env.bounds.size.y - 4.4)
+	_rect(Rect2(sky.position.x, sky.position.y, sky.size.x, sky.size.y * 0.5), Color("3d5566"))
+	_rect(Rect2(sky.position.x, sky.position.y + sky.size.y * 0.5, sky.size.x, sky.size.y * 0.5), Color("55707d"))
+	# 地下土壤。
+	_rect(Rect2(env.bounds.position.x, env.bounds.position.y, env.bounds.size.x, 4.4), Color("1c292e"))
+	for x in range(int(env.bounds.position.x), int(env.bounds.position.x + env.bounds.size.x)):
+		_line(Vector2(x, -0.08), Vector2(x + 0.2, -0.2), Color("35474a"), 0.022)
+	for speck in _speckles:
+		var point: Vector2 = speck[0]
+		if not env.bounds.has_point(point):
+			continue
+		var color: Color = Color(0.55, 0.6, 0.57, 0.09) if point.y > 0.4 else Color(0.56, 0.51, 0.4, 0.12)
+		brush.draw_circle(to_screen(point), maxf(0.6, speck[1] * unit_scale), color)
+	# 出口标记：白盒用亮色门洞表示。
+	_rect(env.exit_rect, Color("e7c46a", 0.22))
+	_rect(Rect2(env.exit_rect.position, Vector2(env.exit_rect.size.x, 0.06)), Color("e7c46a", 0.8))
+	# 种子标记与锚点支点示意（白盒阶段用简单几何）。
+	for surface in env.surfaces:
+		_line(surface.a, surface.b, Color(BUD, 0.35), 0.02)
+
+
+func _draw_obstacles_and_waters() -> void:
+	var env = game.service.env
+	for obstacle in env.obstacles:
+		var color: Color = Color("28393f")
+		if obstacle.id.begins_with("chair"):
+			color = Color("72776b")
+		elif obstacle.id.begins_with("table"):
+			color = Color("6b7773")
+		elif obstacle.id.begins_with("rail") or obstacle.id.begins_with("post"):
+			color = Color("5f6b60")
+		elif obstacle.id.begins_with("beam"):
+			color = Color("6b5f4a")
+		elif obstacle.id.begins_with("floor") or obstacle.id.begins_with("wall"):
+			color = Color("465b68")
+		_rect(obstacle.rect, color)
+		_line(obstacle.rect.position + Vector2(0, obstacle.rect.size.y), obstacle.rect.end, Color(color.lightened(0.15), 0.8), 0.025)
+	for water in env.waters:
+		if water.id in game.service.state.revealed:
+			var center: Vector2 = water.rect.get_center()
+			for ring in range(4, 0, -1):
+				brush.draw_circle(to_screen(center), ring * 0.12 * unit_scale, Color(WATER, 0.025 * (5 - ring)))
+			_line(center + Vector2(-0.22, 0), center + Vector2(0.22, 0.02), Color(WATER, 0.8), 0.05)
+
+
+func _background_apartment() -> void:
+	var env = game.service.env
 	brush.draw_rect(get_viewport_rect(), Color("17252f"))
 	_rect(Rect2(0, 0.4, 16.0, 9.6), WALL)
 	for index in range(24):
@@ -298,12 +401,6 @@ func _background() -> void:
 	_polyline([Vector2(8.67, 0.55), Vector2(8.98, 1.02), Vector2(9.14, 1.08)], Color("526f70"), 0.12)
 	brush.draw_arc(to_screen(Vector2(8.08, 0.73)), unit_scale * 0.24, 1.1, 5.1, 18, Color("526f70"), 0.045 * unit_scale, true)
 	_polyline([Vector2(2.0, -0.8), Vector2(1.94, -0.25), Vector2(2.12, 0.03), Vector2(2.03, 0.39)], Color("080f15"), 0.13)
-	for water in game.service.env.waters:
-		if water.id in game.service.state.revealed:
-			var center: Vector2 = water.rect.get_center()
-			for ring in range(4, 0, -1):
-				brush.draw_circle(to_screen(center), ring * 0.12 * unit_scale, Color(WATER, 0.025 * (5 - ring)))
-			_line(center + Vector2(-0.22, 0), center + Vector2(0.22, 0.02), Color(WATER, 0.8), 0.05)
 
 
 func _sense() -> void:
@@ -407,8 +504,9 @@ func _polygon(points: Array, color: Color) -> void:
 
 
 func growth_framing() -> Dictionary:
-	var low: Vector2 = Vector2(1.0, -2.8)
-	var high: Vector2 = Vector2(20.0, 7.5)
+	var bounds: Rect2 = game.service.env.bounds
+	var low: Vector2 = bounds.position + Vector2(1.0, 1.2)
+	var high: Vector2 = bounds.end - Vector2(4.0, 2.0)
 	for node in game.service.state.nodes.values():
 		low = low.min(node.pos - Vector2(0.5, 0.5))
 		high = high.max(node.pos + Vector2(0.5, 0.5))
@@ -420,6 +518,9 @@ func growth_framing() -> Dictionary:
 func _memory_glow() -> void:
 	var fade: float = minf(1.0, game.memory_remaining) * minf(1.0, (5.0 - game.memory_remaining) * 2.0)
 	var position: Vector2 = game.service.env.memory_position
+	if game.low_motion:
+		brush.draw_circle(to_screen(position + Vector2(0, 0.3)), unit_scale * 0.8, Color(LIGHT, 0.05 * fade))
+		return
 	for ring in range(8, 0, -1):
 		brush.draw_circle(to_screen(position + Vector2(0, 0.3)), unit_scale * ring * 0.14, Color(LIGHT, 0.018 * fade))
 	for drop in range(3):

@@ -25,7 +25,8 @@ static func evaluate(state, metrics: Dictionary, env) -> Array:
 	if metrics.ordinary_income >= 0.05:
 		_once(state, produced, "tutorial_leaf", "teaching", "叶片开始供能。按住 F 可催生；在感知和预览中，收入与风险会一起暂停。")
 	if metrics.water.q >= 20.0:
-		_once(state, produced, "tutorial_w2", "teaching", "更好的水脉接入了同一片地下水。总供水现在是20，重复扎根不会复制水量。")
+		_once(state, produced, "tutorial_w2", "teaching",
+			"更好的水脉接入了同一片地下水。总供水现在是%d，重复扎根不会复制水量。" % roundi(metrics.water.q))
 	for leaf in state.leaves.values():
 		if leaf.z >= 6.0:
 			suffering = true

@@ -1,16 +1,20 @@
 extends CanvasLayer
 
+const Levels = preload("res://scripts/core/levels.gd")
+
 var game
 var root: Control
 var energy_label: Label
 var water_label: Label
 var income_label: Label
+var selection_label: Label
 var message_label: Label
 var preview_label: Label
 var mode_label: Label
 var energy_bar: ProgressBar
 var modal: Control
 var tool_buttons: Dictionary = {}
+var sense_button: Button = null
 
 const PAPER = Color("e6e0cc")
 const GREEN = Color("b4d184")
@@ -18,6 +22,19 @@ const INK = Color("17252f")
 
 
 func _ready() -> void:
+	_build()
+
+
+# 设置（界面缩放）变更后整体重建；引导进度等动态状态不受影响。
+func apply_settings() -> void:
+	if root != null:
+		root.queue_free()
+		root = null
+	tool_buttons.clear()
+	_build()
+
+
+func _build() -> void:
 	root = Control.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -25,7 +42,7 @@ func _ready() -> void:
 	var font = SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Arial"])
 	theme.default_font = font
-	theme.default_font_size = 18
+	theme.default_font_size = int(18 * game.ui_scale)
 	root.theme = theme
 	add_child(root)
 	var top = HBoxContainer.new()
@@ -39,10 +56,11 @@ func _ready() -> void:
 	var brand = VBoxContainer.new()
 	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(brand)
+	var level_title: String = str(game.service.env.title) if game.service != null else ""
 	brand.add_child(_label("G R O W", 30, PAPER))
-	brand.add_child(_label("向 光 而 生  /  第一章 · 空房间", 13, Color("87969c")))
+	brand.add_child(_label("向 光 而 生  /  " + level_title, 13, Color("87969c")))
 	var resource_panel = PanelContainer.new()
-	resource_panel.custom_minimum_size = Vector2(340, 0)
+	resource_panel.custom_minimum_size = Vector2(360 * game.ui_scale, 0)
 	resource_panel.add_theme_stylebox_override("panel", _box(Color(0.065, 0.1, 0.12, 0.94), 8, Color("465b68"), 10))
 	top.add_child(resource_panel)
 	var resources = VBoxContainer.new()
@@ -52,7 +70,7 @@ func _ready() -> void:
 	energy_bar = ProgressBar.new()
 	energy_bar.max_value = 40
 	energy_bar.show_percentage = false
-	energy_bar.custom_minimum_size = Vector2(320, 5)
+	energy_bar.custom_minimum_size = Vector2(320 * game.ui_scale, 5)
 	energy_bar.add_theme_stylebox_override("background", _box(Color("2b3b42"), 3))
 	energy_bar.add_theme_stylebox_override("fill", _box(GREEN, 3))
 	resources.add_child(energy_bar)
@@ -60,6 +78,8 @@ func _ready() -> void:
 	resources.add_child(water_label)
 	income_label = _label("", 13, PAPER)
 	resources.add_child(income_label)
+	selection_label = _label("", 12, Color("9fb8bd"))
+	resources.add_child(selection_label)
 	var pause = _button("Ⅱ  暂停", game.show_pause)
 	pause.custom_minimum_size = Vector2(96, 45)
 	pause.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
@@ -89,6 +109,9 @@ func _ready() -> void:
 		button.custom_minimum_size = Vector2(120, 62)
 		row.add_child(button)
 		tool_buttons[tool] = button
+	sense_button = _button("感知\n空格", game.toggle_sensing)
+	sense_button.custom_minimum_size = Vector2(84, 62)
+	row.add_child(sense_button)
 	var detail = VBoxContainer.new()
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_theme_constant_override("separation", 5)
@@ -112,8 +135,11 @@ func refresh() -> void:
 	else:
 		water_label.text = "供水 %.0f  /  需求 %.2f" % [metrics.water.q, metrics.water.demand]
 	income_label.text = "光合 +%.2f E / 秒     悬空风险 %.2f" % [metrics.income, metrics.support.max_risk]
+	_update_selection_line(state, metrics)
 	for tool in tool_buttons:
 		tool_buttons[tool].modulate = GREEN if tool == game.selected_tool else PAPER
+	if sense_button != null:
+		sense_button.modulate = GREEN if game.sensing else PAPER
 	var proposal: Dictionary = game.proposal
 	if not proposal.is_empty():
 		if proposal.ok:
@@ -136,8 +162,37 @@ func refresh() -> void:
 		mode_label.text = "空格 感知  ·  Shift 修剪  ·  F 催生  ·  中键 平移  ·  滚轮 缩放"
 
 
+# 选中路径反馈：到种子的供水链、选中器官的水分与光照状态。
+func _update_selection_line(state, metrics: Dictionary) -> void:
+	var node_id: int = game.selected_node
+	if not state.nodes.has(node_id):
+		selection_label.text = ""
+		return
+	var chain: Array = state.parent_chain(node_id)
+	var parts: Array = []
+	var worst_supply: float = 1.0
+	for edge_id in chain:
+		if metrics.water.organs.has(edge_id):
+			worst_supply = minf(worst_supply, metrics.water.organs[edge_id].r)
+	if chain.is_empty():
+		parts.append("选中：种子")
+	else:
+		parts.append("选中路径 %d 段 · 沿途供水 %.2f" % [chain.size(), worst_supply])
+	var leaf_id: int = state.leaf_at(node_id, true)
+	if leaf_id != 0 and metrics.light.has(leaf_id):
+		parts.append("叶光照 %.2f" % metrics.light[leaf_id].light)
+	elif metrics.water.organs.has(node_id):
+		parts.append("此处供水 %.2f" % metrics.water.organs[node_id].r)
+	if worst_supply < 0.95:
+		parts.append("缺水")
+	if metrics.support.max_risk > 1.0:
+		parts.append("承重吃力 %.2f" % metrics.support.max_risk)
+	selection_label.text = "  ·  ".join(parts)
+
+
 func set_message(text: String) -> void:
-	message_label.text = text
+	if message_label != null and message_label.text != text:
+		message_label.text = text
 
 
 func close_modal() -> void:
@@ -148,13 +203,33 @@ func close_modal() -> void:
 
 func show_title() -> void:
 	var content = _modal("向 光 而 生", "一颗种子，落在无人居住的房间。\n伸出根，触碰水。沿着遗留的家具，寻找窗外的光。\n\n你长出的身体，就是你走过的路。")
-	if game.load_status.get("ok", false):
-		content.add_child(_button("继续上次的生长", game.continue_game))
+	for definition in Levels.ordered():
+		var unlocked: bool = Levels.is_unlocked(definition.id)
+		if not unlocked:
+			content.add_child(_label("%s  ·  通关上一章后解锁" % definition.title, 15, Color("5c6b70")))
+			continue
+		var row = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		content.add_child(row)
+		var chapter_saves = load("res://scripts/core/save_service.gd").new(Levels.save_dir_for(definition.id), definition.id)
+		var chapter_status: Dictionary = chapter_saves.load_latest()
+		row.add_child(_label(definition.title, 17, PAPER))
+		if chapter_status.ok:
+			row.add_child(_button("继续", game.continue_game.bind(definition.id)))
+			row.add_child(_button("重新开始", game.start_new_game.bind(definition.id)))
+		elif definition.id == game.level_id:
+			row.add_child(_button("开始生长", game.start_new_game.bind(definition.id)))
+		else:
+			row.add_child(_button("开始", game.start_new_game.bind(definition.id)))
+		if chapter_status.get("future_version", false):
+			row.add_child(_label(chapter_status.reason, 13, Color("d79b67")))
+	if game.load_status.get("ok", false) and game.level_id == Levels.APARTMENT:
+		content.add_child(_button("继续上次的生长", game.continue_game.bind(Levels.APARTMENT)))
 	elif game.load_status.get("found", false):
 		var notice = _label(game.load_status.reason, 15, Color("d79b67"))
 		notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		content.add_child(notice)
-	content.add_child(_button("开始新的生长" if game.load_status.get("found", false) else "开始生长", game.start_new_game))
+		content.add_child(_button("开始新的生长", game.start_new_game.bind(game.level_id)))
 	content.add_child(_label("拖拽引导生长  /  预览时暂停  /  随时可以退守种子", 14, Color("87969c")))
 
 
@@ -164,8 +239,11 @@ func show_pause() -> void:
 	content.add_child(_volume_row("整体音量", "Master"))
 	content.add_child(_volume_row("环境声", "Ambience"))
 	content.add_child(_volume_row("动作音效", "SFX"))
+	content.add_child(_settings_rows())
 	content.add_child(_button("保存进度  ·  F5", game.save_progress.bind(true)))
 	content.add_child(_button("退守种子…", game.show_rescue))
+	content.add_child(_button("重看本步引导", game.replay_guide_hint))
+	content.add_child(_button("跳过引导", game.skip_guide))
 	content.add_child(_button("保存并退出", game.request_quit))
 	content.add_child(_label("1 根 · 2 藤 · 3 叶 · 4 强化\n空格感知 · Shift 修剪 · F 催生\n中键平移 · 滚轮缩放 · Home 回到选中点", 16, PAPER))
 
@@ -190,6 +268,36 @@ func _volume_row(label_text: String, bus_name: String) -> HBoxContainer:
 	return row
 
 
+# 可读性与操作设置：界面缩放、感知按住/切换、低动态效果。
+func _settings_rows() -> VBoxContainer:
+	var box = VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	var scale_row = HBoxContainer.new()
+	scale_row.add_theme_constant_override("separation", 18)
+	scale_row.add_child(_label("界面缩放", 16, PAPER))
+	for option in [1.0, 1.25, 1.5]:
+		var mark: String = "▸" if is_equal_approx(game.ui_scale, option) else "　"
+		var scale_button = _button("%s%.0f%%" % [mark, option * 100.0], game.set_ui_scale.bind(option))
+		scale_button.toggle_mode = false
+		scale_row.add_child(scale_button)
+	box.add_child(scale_row)
+	var sense_row = HBoxContainer.new()
+	sense_row.add_theme_constant_override("separation", 18)
+	sense_row.add_child(_label("感知方式", 16, PAPER))
+	sense_row.add_child(_button("按住空格" if not game.sensing_toggle else "▸按住空格",
+		game.set_sensing_toggle.bind(false)))
+	sense_row.add_child(_button("点击切换" if game.sensing_toggle else "▸点击切换",
+		game.set_sensing_toggle.bind(true)))
+	box.add_child(sense_row)
+	var motion_row = HBoxContainer.new()
+	motion_row.add_theme_constant_override("separation", 18)
+	motion_row.add_child(_label("动态效果", 16, PAPER))
+	motion_row.add_child(_button("低动态（减少摆动与光晕）" if not game.low_motion else "▸低动态（减少摆动与光晕）",
+		game.set_low_motion.bind(not game.low_motion)))
+	box.add_child(motion_row)
+	return box
+
+
 func show_rescue() -> void:
 	var content = _modal("回到那颗种子", "当前能量归零，所有普通枝叶退为残痕。\n探索和记忆会留下。种子恢复两条固定根和一片应急子叶，\n子叶最多提供 18 能量，足够重新长出三段藤和一片叶。")
 	content.add_child(_button("确认退守", game.confirm_rescue))
@@ -197,7 +305,7 @@ func show_rescue() -> void:
 
 
 func show_victory() -> void:
-	var content = _modal("G R O W  ·  向光而生", "你从地板下醒来，借着旧物，长成了自己的路。\n那些剪去的枝、留下的伤口，也成为这株植物的一部分。\n\n第一章 · 空房间  完成")
+	var content = _modal("G R O W  ·  向光而生", "你从地板下醒来，借着旧物，长成了自己的路。\n那些剪去的枝、留下的伤口，也成为这株植物的一部分。\n\n" + str(game.service.env.title) + "  完成")
 	content.add_child(_button("继续观察", game.resume_game))
 	content.add_child(_button("返回标题", game.return_to_title))
 
@@ -229,7 +337,7 @@ func _modal(title: String, body: String) -> VBoxContainer:
 func _label(text: String, size: int, color: Color) -> Label:
 	var label = Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", int(round(size * game.ui_scale)))
 	label.add_theme_color_override("font_color", color)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return label

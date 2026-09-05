@@ -16,6 +16,10 @@ var _solver_cache_key: Array = []
 # 状态摘要在revision/能量/时钟未变时复用，避免每次预览重复SHA256全状态。
 var _digest_cache: Dictionary = {}
 var _digest_key: Array = []
+# 光照只依赖叶集合/位置/角度与应急饱和：根/藤/强化预览不改叶，
+# 可复用最近一次光照结果（O(L²) 是预览最贵的一步）。
+var _light_cache: Dictionary = {}
+var _light_cache_key: Array = []
 
 
 func _init(initial_state, environment) -> void:
@@ -49,7 +53,7 @@ func preview(kind: String, target: int, direction: Vector2 = Vector2.ZERO) -> Di
 		result.reason = "还需要 %.1f 能量" % (result.cost - state.energy)
 		return result
 	candidate.energy -= result.cost
-	var computed: Dictionary = metrics(candidate)
+	var computed: Dictionary = _preview_metrics(candidate, kind)
 	result.metrics = computed
 	if kind in ["root", "vine", "leaf", "reinforce"] and computed.support.max_risk > 1.50001:
 		result.reason = "悬空负载过大；先强化或寻找支点"
@@ -61,7 +65,7 @@ func preview(kind: String, target: int, direction: Vector2 = Vector2.ZERO) -> Di
 	result.ok = true
 	result.candidate = candidate
 	result.source_hash = _digest(state)
-	result.candidate_hash = _digest(candidate)
+	result.candidate_fingerprint = _fingerprint(candidate)
 	return result
 
 
@@ -75,7 +79,7 @@ func commit(proposal: Dictionary, command_id: String) -> Dictionary:
 		return {"ok": false, "reason": proposal.get("reason", "没有可确认的操作")}
 	if proposal.revision != state.revision or proposal.get("source_hash", "") != _digest(state):
 		return {"ok": false, "reason": "植物状态已经变化，请重新预览"}
-	if not proposal.has("candidate") or proposal.get("candidate_hash", "") != _digest(proposal.candidate):
+	if not proposal.has("candidate") or proposal.get("candidate_fingerprint", []) != _fingerprint(proposal.candidate):
 		return {"ok": false, "reason": "预览内容已变化，请重新预览"}
 	state = proposal.candidate.clone()
 	state.revision += 1
@@ -92,6 +96,30 @@ func commit(proposal: Dictionary, command_id: String) -> Dictionary:
 	return result
 
 
+# 预览用指标：与 metrics() 同构，但光照可复用。
+# 根/藤/强化不新增、不移动、不修剪叶片，叶集合指纹未变时光照结果逐叶相同。
+func _preview_metrics(candidate, kind: String) -> Dictionary:
+	var key: Array = [candidate.leaves.size(), candidate.next_id,
+		candidate.emergency_produced >= 18.0]
+	var light: Dictionary = {}
+	if kind in ["root", "vine", "reinforce"] and _light_cache_key == key and not _light_cache.is_empty():
+		light = _light_cache
+	else:
+		light = Light.solve(candidate, env)
+		_light_cache = light
+		_light_cache_key = key
+	var parallel: Array = [{}, {}]
+	var accesses: Array = env.water_contacts(candidate)
+	var water_task: int = WorkerThreadPool.add_task(func() -> void:
+		parallel[0] = Water.solve(candidate, accesses))
+	var support_task: int = WorkerThreadPool.add_task(func() -> void:
+		parallel[1] = Support.solve(candidate))
+	WorkerThreadPool.wait_for_task_completion(water_task)
+	WorkerThreadPool.wait_for_task_completion(support_task)
+	return _assemble_metrics(candidate,
+		{"water": parallel[0], "support": parallel[1], "light": light})
+
+
 func metrics(plant = null) -> Dictionary:
 	if plant == null:
 		plant = state
@@ -104,6 +132,9 @@ func metrics(plant = null) -> Dictionary:
 		key = [plant.edges.size(), plant.leaves.size(), plant.next_id,
 			plant.emergency_produced >= 18.0]
 		if not _solver_cache.is_empty() and key == _solver_cache_key:
+			_light_cache = _solver_cache.light
+			_light_cache_key = [plant.leaves.size(), plant.next_id,
+				plant.emergency_produced >= 18.0]
 			return _assemble_metrics(plant, _solver_cache)
 	# 三个求解器只读植物与环境且互不依赖，worker线程并行；光求解留主线程
 	# 以保持测试替身ray_blocked的调用契约（含查询记录）。
@@ -121,6 +152,9 @@ func metrics(plant = null) -> Dictionary:
 	if cacheable:
 		_solver_cache = {"water": water, "support": support, "light": light}
 		_solver_cache_key = key
+		_light_cache = light
+		_light_cache_key = [plant.leaves.size(), plant.next_id,
+			plant.emergency_produced >= 18.0]
 		return _assemble_metrics(plant, _solver_cache)
 	return _assemble_metrics(plant, {"water": water, "support": support, "light": light})
 
@@ -335,9 +369,31 @@ static func _compute_digest(plant) -> String:
 			# 历史只增不改、不参与命令语义：摘要记录规模而非全部内容，
 			#revision/tick仍随任何追加递增，避免每次摘要序列化整段残枝。
 			fields[field] = plant.history.size()
+		elif field == "guide":
+			continue
 		else:
 			fields[field] = plant.get(field)
 	var context = HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
 	context.update(var_to_bytes(fields))
 	return context.finish().hex_encode()
+
+
+# 候选指纹：廉价字段向量，用于提交前核对候选未被改写。
+# 语义字段（能量/结构规模/ID水位/事件数）全覆盖；坐标与长度以代数和
+# 纳入（O(n) 纯算术，无哈希），任何节点位置或边长篡改都会失配；
+# z/bend 等逐tick量不参与命令语义，刻意排除。
+static func _fingerprint(plant) -> Array:
+	var position_sum: float = 0.0
+	for node in plant.nodes.values():
+		position_sum += node.pos.x + node.pos.y
+	var length_sum: float = 0.0
+	for edge in plant.edges.values():
+		length_sum += edge.length + float(edge.slot)
+	var leaf_sum: float = 0.0
+	for leaf in plant.leaves.values():
+		leaf_sum += leaf.angle + float(leaf.node)
+	return [plant.revision, plant.energy, plant.tick, plant.next_id,
+		plant.nodes.size(), plant.edges.size(), plant.leaves.size(),
+		plant.history.size(), plant.events.size(), plant.scars.size(),
+		plant.emergency_produced, plant.won, position_sum, length_sum, leaf_sum]

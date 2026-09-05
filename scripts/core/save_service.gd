@@ -2,19 +2,26 @@ extends RefCounted
 
 const Model = preload("res://scripts/core/plant_state.gd")
 const Level = preload("res://scripts/core/environment.gd")
-const SCHEMA: int = 1
+const SCHEMA: int = 2
 const RULES: String = "grow-p0-v1"
 const LEVEL_ID: String = "apartment"
 const MAX_FILE_BYTES: int = 64 * 1024 * 1024
 
 var directory: String
+var level_id: String = LEVEL_ID
+# 版本保护：目录里出现未来/异规则世代后暂停写入，防止旧规则进度覆盖它。
+var incompatible_locked: bool = false
 
 
-func _init(save_directory: String = "user://saves/chapter1") -> void:
+func _init(save_directory: String = "user://saves/chapter1", level_identifier: String = LEVEL_ID) -> void:
 	directory = save_directory.trim_suffix("/")
+	level_id = level_identifier
+	incompatible_locked = FileAccess.file_exists(directory + "/.incompatible")
 
 
 func save(state) -> Dictionary:
+	if incompatible_locked:
+		return {"ok": false, "reason": "这里存有更新版本游戏的进度，已暂停写入以保护它。"}
 	var payload: Dictionary = {}
 	for field in Model.persistent_fields():
 		payload[field] = state.get(field)
@@ -40,7 +47,7 @@ func save(state) -> Dictionary:
 		final_path = directory + "/" + token + ".json"
 	var payload_text: String = JSON.stringify(_encode(payload), "", true, true)
 	var envelope: Dictionary = {"schema_version": SCHEMA, "rules_version": RULES,
-		"level_id": LEVEL_ID, "level_revision": 1, "engine_build": Engine.get_version_info().hash,
+		"level_id": level_id, "level_revision": 1, "engine_build": Engine.get_version_info().hash,
 		"generation": generation, "checksum": payload_text.sha256_text(), "payload": payload_text}
 	var text: String = JSON.stringify(envelope, "\t", true, true)
 	if text.to_utf8_buffer().size() > MAX_FILE_BYTES:
@@ -86,6 +93,16 @@ func load_latest() -> Dictionary:
 		"reason": "已有存档均未通过校验。可以开始新的生长，原存档仍保留供恢复。"}
 
 
+func _incompatible(reason: String) -> Dictionary:
+	incompatible_locked = true
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
+	var marker = FileAccess.open(directory + "/.incompatible", FileAccess.WRITE)
+	if marker != null:
+		marker.store_string(reason)
+		marker.close()
+	return {"ok": false, "future_version": true, "reason": reason}
+
+
 func _generations() -> Array:
 	var result: Array = []
 	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(directory)):
@@ -117,20 +134,28 @@ func _read(path: String) -> Dictionary:
 	if not _number(envelope.get("schema_version")):
 		return failure
 	if envelope.schema_version > SCHEMA:
-		return {"ok": false, "future_version": true, "reason": "这份存档来自较新的游戏版本，请使用对应版本继续。原存档未修改。"}
-	if envelope.schema_version != SCHEMA or envelope.get("rules_version", "") != RULES or envelope.get("level_id", "") != LEVEL_ID or envelope.get("level_revision", 0) != 1:
+		return _incompatible("这份存档来自较新的游戏版本，请使用对应版本继续。原存档未修改。")
+	# 同 schema 但规则版本不同：来自另一套规则的进度，同样不许被旧规则覆盖。
+	if envelope.schema_version == SCHEMA and str(envelope.get("rules_version", "")) != RULES:
+		return _incompatible("这份存档使用了不同规则版本，无法在这里继续。原存档未修改。")
+	if envelope.schema_version < 1 or envelope.schema_version > SCHEMA or str(envelope.get("rules_version", "")) != RULES:
+		return failure
+	if envelope.get("level_id", "") != level_id or envelope.get("level_revision", 0) != 1:
 		return failure
 	if not envelope.get("payload") is String or not envelope.get("checksum") is String:
 		return failure
 	if envelope.payload.sha256_text() != envelope.checksum:
 		return failure
-	if not _number(envelope.get("generation")) or envelope.generation < 1:
+	if not _number(envelope.get("generation")) or envelope.generation < 1 or float(int(envelope.generation)) != envelope.generation:
 		return failure
 	if json.parse(envelope.payload) != OK or not json.data is Dictionary:
 		return failure
 	var decoded = _decode(json.data)
 	if not decoded is Dictionary:
 		return failure
+	if envelope.schema_version < SCHEMA:
+		# 旧 schema 迁移：guide 是 v0.1.1 新增的引导进度字段。
+		decoded["guide"] = {"step": 0, "skipped": false, "helped": false}
 	for field in ["nodes", "edges", "leaves"]:
 		if not decoded.get(field) is Dictionary:
 			return failure
@@ -238,6 +263,10 @@ static func _shape_problem(data: Dictionary) -> String:
 				return "叶片数值无效"
 		if leaf.z < 0.0 or leaf.produced < 0.0 or leaf.produced > 18.000001:
 			return "叶片积分无效"
+	if not data.guide is Dictionary or not data.guide.get("step", -1) is int or data.guide.step < 0:
+		return "引导进度无效"
+	if not data.guide.get("skipped", "") is bool or not data.guide.get("helped", "") is bool:
+		return "引导进度无效"
 	return ""
 
 
