@@ -1,0 +1,46 @@
+{
+  "documents": {
+    "00_设计基线.md": {
+      "chars": 1972,
+      "han": 1279,
+      "sections": 4
+    },
+    "01_游戏设计文档_GDD.md": {
+      "chars": 10219,
+      "han": 7060,
+      "sections": 15
+    },
+    "02_技术设计文档_TDD.md": {
+      "chars": 15607,
+      "han": 8382,
+      "sections": 15
+    },
+    "03_美术风格指南_Art_Bible.md": {
+      "chars": 8954,
+      "han": 5635,
+      "sections": 8
+    },
+    "04_项目管理文档_PM.md": {
+      "chars": 8688,
+      "han": 5533,
+      "sections": 11
+    },
+    "README.md": {
+      "chars": 2028,
+      "han": 1139,
+      "sections": 5
+    }
+  },
+  "local_links": 19,
+  "checks": [
+    "SVG: 生长美术规范板.svg",
+    "SVG: 第一章白盒地图.svg",
+    "WBS: 23 packages = 192 h",
+    "Weeks: 12 x 16 h + 48 h buffer",
+    "Art/audio: 58 h, allocation exact",
+    "Water fixture: 11 rows and totals exact",
+    "Initial/recovery energy: 26/18 E",
+    "Structure examples: 1.975 / 2.095"
+  ],
+  "status": "PASS - document checks only; game implementation and playtests not run"
+}

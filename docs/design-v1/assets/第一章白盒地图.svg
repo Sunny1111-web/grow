@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080">
+<defs>
+  <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse" patternTransform="translate(100 210)"><path d="M48 0H0V48" fill="none" stroke="#cdd5d5" stroke-width="1"/></pattern>
+  <pattern id="soil" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M3 18l5-4m7-8l4-3" stroke="#bbc6c3" stroke-width="1"/></pattern>
+  <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#3c7458" stroke-width="2"/></marker>
+  <marker id="waterarrow" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#318598" stroke-width="2"/></marker>
+  <style>text{font-family:'Microsoft YaHei','Noto Sans CJK SC',sans-serif;fill:#243b3f} .small{font-size:17px}.label{font-size:19px;font-weight:600}.caption{font-size:18px;fill:#556b6e}.point{fill:#fff;stroke:#3c7458;stroke-width:3}.call{stroke:#6b7d7f;stroke-width:1.3;fill:none}</style>
+</defs>
+<rect width="1600" height="1080" fill="#f5f3eb"/>
+<text x="70" y="72" font-size="17" letter-spacing="4" fill="#638171">GROW / DESIGN DOCUMENTATION</text>
+<text x="70" y="128" font-size="38" font-weight="700">第一章 裂缝 · 白盒空间设计</text>
+<text x="70" y="164" class="caption">设计示意，非运行截图　｜　1格 = 1u　｜　坐标 y 向上，进入 Godot 时转换</text>
+<rect x="100" y="210" width="1152" height="672" rx="4" fill="#e7eae6"/>
+<rect x="100" y="690" width="1152" height="192" fill="#d1dad5"/>
+<rect x="100" y="690" width="1152" height="192" fill="url(#soil)"/>
+<rect x="100" y="210" width="1152" height="672" fill="url(#grid)"/>
+<!-- Background city belongs to the end camera, not to playable space. -->
+<g fill="#c1cbd0" opacity=".85"><path d="M970 550V304h58v246m22 0V254h85v296m20 0V344h68v206"/><path d="M985 314h7v9h-7zm20 0h7v9h-7zm62-30h9v12h-9zm25 0h9v12h-9zm-25 31h9v12h-9zm25 0h9v12h-9z" fill="#edf0ec"/></g>
+<text x="982" y="590" class="small" fill="#677d86">远景城市 · P0不可探索</text>
+<!-- Light zones -->
+<rect x="253.6" y="570" width="86.4" height="72" rx="8" fill="#e3c573" opacity=".6"/>
+<path d="M236 385L340 570H254Z" fill="#ecd99b" opacity=".32"/>
+<rect x="508" y="450" width="120" height="72" rx="8" fill="#edc14c" opacity=".5"/>
+<path d="M868 378L628 522H508Z" fill="#edc14c" opacity=".13"/>
+<!-- Apartment and furniture -->
+<path d="M100 690H176.8m38.4 0H868M868 690V474m0-120V210H100" fill="none" stroke="#576c73" stroke-width="12"/>
+<path d="M177 690l-10 20m48-20l10 20" stroke="#576c73" stroke-width="4"/>
+<path d="M244 618h144m-125 0v72m106-72v72m-117-72v-54" fill="none" stroke="#778885" stroke-width="9" stroke-linejoin="round"/>
+<path d="M436 522h192m-175 0v168m158-168v168" fill="none" stroke="#778885" stroke-width="12"/>
+<path d="M700 642V378h168" fill="none" stroke="#7f9091" stroke-width="10" stroke-linecap="round"/>
+<path d="M858 474h26m-26-120h26" fill="none" stroke="#576c73" stroke-width="9"/>
+<!-- Soil water and roots -->
+<ellipse cx="196" cy="805.2" rx="30" ry="20" fill="#b2dce0" stroke="#318598" stroke-width="2"/>
+<ellipse cx="484" cy="814.8" rx="38" ry="23" fill="#b2dce0" stroke="#318598" stroke-width="2"/>
+<path d="M210 819Q300 843 440 831" fill="none" stroke="#318598" stroke-width="2" stroke-dasharray="3 9"/>
+<path d="M196 728.4L196 766.8L196 805.2" fill="none" stroke="#80653e" stroke-width="6"/>
+<path d="M216 806Q318 780 478 810" fill="none" stroke="#318598" stroke-width="3" stroke-dasharray="9 6" marker-end="url(#waterarrow)"/>
+<!-- Example main route, not an engine validated solution -->
+<path d="M196 728Q190 700 196 680Q213 652 237 641Q254 630 278 632Q320 627 365 619Q413 619 453 615Q457 577 454 527Q487 521 535 520Q600 517 649 521Q680 520 700 505L700 403Q748 378 796 379Q841 378 872 392L918 388" fill="none" stroke="#3c7458" stroke-width="5" stroke-linecap="round" marker-end="url(#arrow)"/>
+<path d="M455 626Q490 659 535 649Q620 643 700 629" fill="none" stroke="#6b9277" stroke-width="3" stroke-dasharray="8 7"/>
+<path d="M328 607L846 409" fill="none" stroke="#b87460" stroke-width="2.5" stroke-dasharray="7 7"/>
+<path d="M573 500l14-14m0 14l-14-14" stroke="#b87460" stroke-width="3"/>
+<text x="487" y="418" class="small" fill="#98604f">直接横跨：悬空过长</text>
+<!-- Fixed recovery anchor and non-producing moisture cues -->
+<circle cx="196" cy="721.2" r="7" fill="#e7c46a" stroke="#796d45" stroke-width="2"/>
+<path d="M203 719L252 735" class="call"/>
+<text x="256" y="742" class="small">R0 固定应急子叶</text>
+<g fill="#f5f3eb" stroke="#318598" stroke-width="2"><circle cx="272.8" cy="805.2" r="5"/><circle cx="349.6" cy="810" r="5"/><circle cx="426.4" cy="814.8" r="5"/></g>
+<text x="272" y="778" class="small">C1 → C2 → C3 湿润线索</text>
+<!-- Nodes and small icons -->
+<g class="point"><circle cx="196" cy="690" r="7"/><circle cx="263" cy="635" r="7"/><circle cx="370" cy="619" r="7"/><circle cx="453" cy="615" r="7"/><circle cx="535" cy="522" r="7"/><circle cx="700" cy="505" r="7"/><circle cx="700" cy="403" r="7"/><circle cx="864" cy="391" r="7"/></g>
+<ellipse cx="196" cy="728.4" rx="13" ry="18" transform="rotate(-20 196 728.4)" fill="#947247"/>
+<path d="M278 632Q278 610 299 613Q298 633 278 632M535 520Q523 492 503 505Q509 525 535 520" fill="#6c9755"/>
+<path d="M500 663h18v-23h-18zm18-17q16-5 11 8h-11" fill="none" stroke="#967f65" stroke-width="3"/>
+<rect x="887" y="364" width="48" height="48" rx="8" fill="#d9eacb" fill-opacity=".55" stroke="#3c7458" stroke-width="2" stroke-dasharray="5 4"/>
+<!-- Labels -->
+<text x="113" y="760" class="label">S0 种子</text>
+<text x="129" y="850" class="label">W1 12 W</text>
+<text x="429" y="857" class="label">W2 总20 W</text>
+<text x="646" y="817" class="small">同一含水层，供水不可相加</text>
+<text x="112" y="655" class="small">F0 裂缝</text>
+<text x="285" y="550" class="label">L1 普通光</text>
+<path d="M323 557L300 574" class="call"/>
+<text x="283" y="677" class="small">S1 椅子</text>
+<text x="484" y="560" class="label">S2 书桌</text>
+<text x="509" y="444" class="label">L2 强光</text>
+<text x="466" y="607" class="small">低位可选路线</text>
+<text x="546" y="678" class="small">M1 水壶记忆</text>
+<text x="723" y="544" class="label">S3 管道</text>
+<text x="897" y="459" class="label">S4 窗框</text>
+<text x="894" y="335" class="label">G 出口</text>
+<text x="107" y="232" class="small">y=10</text><text x="107" y="875" class="small">y=-4</text>
+<text x="99" y="911" class="small">x=0</text><text x="1221" y="911" class="small">24u</text>
+<!-- Right note column -->
+<text x="1300" y="237" font-size="23" font-weight="700">图例与验收</text>
+<path d="M1300 280h38" stroke="#3c7458" stroke-width="5"/><text x="1350" y="286" class="small">推荐地上路线</text>
+<path d="M1300 324h38" stroke="#318598" stroke-width="3" stroke-dasharray="7 4"/><text x="1350" y="330" class="small">地下扩展路线</text>
+<circle cx="1318" cy="370" r="7" class="point"/><text x="1350" y="376" class="small">可攀附支点</text>
+<rect x="1303" y="405" width="30" height="18" fill="#edc14c" opacity=".6"/><text x="1350" y="422" class="small">固定光照区域</text>
+<path d="M1300 460h38" stroke="#b87460" stroke-width="2.5" stroke-dasharray="6 4"/><text x="1350" y="466" class="small">高风险直达方向</text>
+<text x="1300" y="532" class="label">首叶路线预算</text>
+<text x="1300" y="570" class="small">2根 × 4 = 8 E</text>
+<text x="1300" y="601" class="small">3藤 × 5 = 15 E</text>
+<text x="1300" y="632" class="small">1叶 × 3 = 3 E</text>
+<text x="1300" y="674" font-size="22" font-weight="700">30 − 26 = 4 E</text>
+<text x="1300" y="726" class="small">绿色曲线表达路线意图，</text>
+<text x="1300" y="754" class="small">并非每段的最终几何。</text>
+<text x="1300" y="798" class="small">白盒须实测固定段长、</text>
+<text x="1300" y="826" class="small">碰撞、向性、支撑与水。</text>
+<text x="1300" y="854" class="small">通过后才能锁定坐标。</text>
+<text x="100" y="973" font-size="22" font-weight="600">体验顺序：接水 → 破土 → 第一片叶 → 扩张与支撑 → 水压力与修剪 → 窗外</text>
+<text x="100" y="1014" class="caption">静态白盒规范 v1.0　｜　2026年9月5日　｜　共生幼苗属于P1，未计入本图与P0关卡承诺</text>
+</svg>

@@ -1,0 +1,281 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="1100" viewBox="0 0 1600 1100" role="img" aria-labelledby="board-title board-desc">
+  <title id="board-title">向光而生 · 生长美术规范板</title>
+  <desc id="board-desc">P0 废弃公寓的原生矢量美术设计示意。包含十色主色板，根、嫩藤、强化枝干与叶片形态，健康、萎蔫、枯萎、死亡状态对照，支点、修剪、合法与受阻预览标记。左侧为设计示意，非运行截图。</desc>
+  <defs>
+    <style>
+      text{font-family:"Microsoft YaHei","Noto Sans CJK SC","PingFang SC",sans-serif;fill:#17252F}
+      .serif{font-family:"Noto Serif CJK SC","Source Han Serif SC","SimSun",serif}
+      .cap{font-size:15px;letter-spacing:2px;fill:#465B68}
+      .section{font-size:23px;font-weight:700}
+      .label{font-size:18px;font-weight:700}
+      .small{font-size:15px;fill:#465B68}
+      .tiny{font-size:13px;fill:#465B68}
+      .white{fill:#E6E0CC}
+      .line{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+    <pattern id="hatch-gold" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(24)">
+      <path d="M0 0V18" stroke="#E7C46A" stroke-width="1.5" opacity=".45"/>
+    </pattern>
+    <pattern id="hatch-prune" width="13" height="13" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+      <path d="M0 0V13" stroke="#D79B67" stroke-width="3" opacity=".8"/>
+    </pattern>
+    <symbol overflow="visible" id="leaf-open" viewBox="-65 -92 92 106">
+      <path d="M0 0C-31-5-55-31-54-78C-19-78 20-48 0 0Z" fill="#6F9E62" stroke="#30483B" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M0 7C-7-20-24-50-47-70M-13-28L-33-29M-20-42L-16-60M-29-53L-44-51" fill="none" stroke="#B4D184" stroke-width="1.7" stroke-linecap="round"/>
+    </symbol>
+    <symbol overflow="visible" id="leaf-wilt" viewBox="-65 -92 92 106">
+      <path d="M0 0C-13-24-20-38-33-35C-60-29-50 8-25 30C-16 3-18-16-32-24C-19-29-8-11 0 0Z" fill="#6F9E62" stroke="#30483B" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M0 7C-11-15-28-40-36-24C-42-9-30 10-25 23M-36-12L-45-13M-33 1L-25 2" class="line" stroke="#D79B67" stroke-width="1.8"/>
+    </symbol>
+    <symbol overflow="visible" id="leaf-curl" viewBox="-65 -92 92 106">
+      <path d="M0 0C-9-18-26-35-39-27L-35-20L-47-16L-40-9C-48 7-31 30-16 28C-4 27-7 13-17 10C-26 7-23 18-16 16C-23 13-31 8-30-3L-23-8L-29-15C-18-14-6-4 0 0Z" fill="currentColor" stroke="#594F43" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M0 7C-9-12-39-30-36-9C-39 4-27 18-16 21M-36-13L-29-8M-36 0L-28 3M-27 15L-24 9" class="line" stroke="#E6E0CC" stroke-width="1.4" opacity=".65"/>
+    </symbol>
+    <g id="water-outline" class="line" stroke="currentColor" stroke-width="2.3">
+      <path d="M0-13C-2-8-10 0-10 6A10 10 0 0 0 10 6C10 0 2-8 0-13Z"/>
+    </g>
+    <g id="clamp" class="line" stroke="currentColor" stroke-width="3">
+      <path d="M-13-11H-19V11H-13M13-11H19V11H13M-13-5V5M13-5V5"/>
+      <circle r="4" fill="currentColor" stroke="none"/>
+    </g>
+    <g id="scissors" class="line" stroke="currentColor" stroke-width="2.6">
+      <circle cx="-10" cy="10" r="5"/><circle cx="10" cy="10" r="5"/>
+      <path d="M-6 6L13-16M6 6L-13-16"/>
+    </g>
+    <g id="stop" fill="none" stroke="currentColor" stroke-width="2.8">
+      <path d="M-7-16H7L16-7V7L7 16H-7L-16 7V-7Z"/><path d="M-8 0H8"/>
+    </g>
+  </defs>
+
+  <!-- 文档型原生 SVG；文字保留可编辑，不直接作为运行时 HUD。 -->
+  <rect width="1600" height="1100" fill="#E6E0CC"/>
+  <path d="M44 104H1556" stroke="#17252F" stroke-width="2"/>
+  <text x="44" y="36" class="cap">GROW / 向光而生 / VISUAL DEVELOPMENT</text>
+  <text x="42" y="82" class="serif" font-size="42" font-weight="700">在灰蓝废墟里，读见一条生命</text>
+  <text x="1556" y="38" text-anchor="end" class="label">生长美术规范板 · P0</text>
+  <text x="1556" y="67" text-anchor="end" class="small">一间公寓 · 15～20 分钟 · 纯 2D 横向剖面</text>
+  <text x="1556" y="89" text-anchor="end" class="tiny">v1.0 / 2026.09.05 / 用户 × GPT-6 Astra</text>
+
+  <text x="44" y="137" class="cap">01  主色板</text>
+  <text x="1556" y="137" text-anchor="end" class="small">灰蓝环境 70%～80%　·　植物 10%～20%　·　光与水合计尽量低于 10%</text>
+  <g>
+    <rect x="44" y="155" width="142" height="56" fill="#17252F"/>
+    <text x="44" y="235" class="small">室内深阴影</text><text x="44" y="257" class="tiny">#17252F</text>
+    <rect x="196" y="155" width="142" height="56" fill="#465B68"/>
+    <text x="196" y="235" class="small">废墟结构</text><text x="196" y="257" class="tiny">#465B68</text>
+    <rect x="348" y="155" width="142" height="56" fill="#87969C"/>
+    <text x="348" y="235" class="small">褪色墙面</text><text x="348" y="257" class="tiny">#87969C</text>
+    <rect x="500" y="155" width="142" height="56" fill="#E6E0CC" stroke="#87969C"/>
+    <text x="500" y="235" class="small">纸白 / UI 正文</text><text x="500" y="257" class="tiny">#E6E0CC</text>
+    <rect x="652" y="155" width="142" height="56" fill="#6F9E62"/>
+    <text x="652" y="235" class="small">健康植物</text><text x="652" y="257" class="tiny">#6F9E62</text>
+    <rect x="804" y="155" width="142" height="56" fill="#B4D184"/>
+    <text x="804" y="235" class="small">新芽高光</text><text x="804" y="257" class="tiny">#B4D184</text>
+    <rect x="956" y="155" width="142" height="56" fill="#E7C46A"/>
+    <text x="956" y="235" class="small">光照 / 疏斜线</text><text x="956" y="257" class="tiny">#E7C46A</text>
+    <rect x="1108" y="155" width="142" height="56" fill="#67B8C6"/>
+    <text x="1108" y="235" class="small">水源 / 滴形</text><text x="1108" y="257" class="tiny">#67B8C6</text>
+    <rect x="1260" y="155" width="142" height="56" fill="#D79B67"/>
+    <text x="1260" y="235" class="small">可处理的风险</text><text x="1260" y="257" class="tiny">#D79B67</text>
+    <rect x="1412" y="155" width="142" height="56" fill="#837262"/>
+    <text x="1412" y="235" class="small">失活组织</text><text x="1412" y="257" class="tiny">#837262</text>
+  </g>
+
+  <text x="44" y="299" class="section">02  公寓中的生长路线</text>
+  <text x="940" y="299" text-anchor="end" class="small">设计示意，非运行截图</text>
+  <svg x="44" y="326" width="896" height="504" viewBox="0 0 896 504">
+    <rect width="896" height="504" fill="#17252F"/>
+    <!-- 建筑大形与少量掉漆，背景裂缝维持低对比。 -->
+    <path d="M24 30H867V369H0V75Z" fill="#465B68"/>
+    <path d="M118 50H483V350H91V148L108 140V89Z" fill="#87969C" opacity=".14"/>
+    <path d="M410 18H846V289L838 296H511V266H403Z" fill="#87969C" opacity=".13"/>
+    <path d="M20 358H896V387H0V370Z" fill="#87969C" opacity=".45"/>
+    <path d="M0 386H896V426H0Z" fill="#273942"/>
+    <path d="M45 426H437L455 440H480V504H45Z" fill="#3D3D38"/>
+    <path d="M490 386L582 424M664 386L730 424M836 385L893 413M0 410H896" stroke="#17252F" stroke-width="3" opacity=".5"/>
+    <g class="line" stroke="#17252F" stroke-width="2" opacity=".3">
+      <path d="M156 53L147 80L160 91L153 116M147 80L129 84"/>
+      <path d="M358 183L340 207L344 228L327 237M341 214L363 222"/>
+      <path d="M846 289L832 317L846 334"/>
+    </g>
+    <path d="M207 95L249 88L256 100L243 119L215 113Z" fill="#87969C" opacity=".17"/>
+    <path d="M822 193L849 180L859 215L841 230L822 220Z" fill="#87969C" opacity=".12"/>
+    <!-- 窗外远城分两层，窗框拥有清晰、连贯的可攀附边缘。 -->
+    <rect x="541" y="47" width="282" height="222" fill="#A5AAA0"/>
+    <path d="M541 165H566V125H598V151H617V108H644V142H672V119H708V169H736V100H763V146H785V124H823V269H541Z" fill="#87969C"/>
+    <path d="M541 211H581V182H608V217H632V169H674V199H711V177H745V225H779V185H823V269H541Z" fill="#465B68" opacity=".8"/>
+    <g fill="#E6E0CC" opacity=".18">
+      <rect x="640" y="181" width="5" height="13"/><rect x="655" y="181" width="5" height="13"/>
+      <rect x="718" y="192" width="5" height="13"/><rect x="733" y="192" width="5" height="13"/>
+      <rect x="793" y="202" width="5" height="13"/>
+    </g>
+    <path d="M548 54H813L597 354H310Z" fill="#E7C46A" opacity=".07"/>
+    <path d="M548 54H813L597 354H310Z" fill="url(#hatch-gold)" opacity=".15"/>
+    <path d="M538 45H826V274H536V46M684 47V273M539 160H824" fill="none" stroke="#17252F" stroke-width="16"/>
+    <path d="M532 41H830M531 280H832M686 48V267M544 158H817" class="line" stroke="#87969C" stroke-width="3"/>
+    <path d="M524 277H839V290H524Z" fill="#87969C"/>
+    <path d="M524 289H839V297H524Z" fill="#17252F"/>
+    <!-- 管道、桌、椅；家具轮廓提供路线。 -->
+    <path d="M479 353V210Q479 191 494 191H524" class="line" stroke="#17252F" stroke-width="16"/>
+    <path d="M478 351V211Q478 192 493 192H523" class="line" stroke="#87969C" stroke-width="6"/>
+    <path d="M225 320H440L431 334H225Z" fill="#87969C"/>
+    <path d="M232 334H430V346H232Z" fill="#17252F"/>
+    <path d="M245 343L240 404M414 343L420 403" class="line" stroke="#17252F" stroke-width="13"/>
+    <path d="M246 345L242 393M414 345L419 393" class="line" stroke="#87969C" stroke-width="3"/>
+    <path d="M103 335L108 397M179 335L178 393M104 336H181M112 330V265H180V330M113 285H179" class="line" stroke="#17252F" stroke-width="11"/>
+    <path d="M110 334H182M114 269H180V324" class="line" stroke="#87969C" stroke-width="3"/>
+    <!-- 旧水壶：唯一空间记忆物件。 -->
+    <path d="M299 292Q287 283 293 270Q300 262 310 270" class="line" stroke="#87969C" stroke-width="5"/>
+    <path d="M302 280L306 310Q323 319 340 309L342 282Z" fill="#465B68" stroke="#87969C" stroke-width="2"/>
+    <path d="M339 296L355 288L365 273L368 276L362 297L339 306Z" fill="#465B68" stroke="#87969C" stroke-width="2"/>
+    <path d="M310 279Q323 274 336 279M319 274H326" class="line" stroke="#87969C" stroke-width="3"/>
+    <!-- 根系、水线索和土粒。 -->
+    <g fill="#837262" opacity=".45">
+      <circle cx="97" cy="447" r="2"/><circle cx="135" cy="471" r="2"/><circle cx="240" cy="489" r="2"/>
+      <circle cx="365" cy="454" r="2"/><circle cx="408" cy="487" r="2"/><circle cx="295" cy="469" r="1.5"/>
+      <path d="M346 484L352 480L357 484Z"/><path d="M118 432L125 428L129 435Z"/>
+    </g>
+    <path d="M181 408C173 437 152 444 147 468M177 423C209 444 232 423 253 445S291 463 314 453M151 457L130 455M204 439L205 467M259 450L268 477" class="line" stroke="#837262" stroke-width="4"/>
+    <path d="M181 410C199 433 225 429 253 449C274 463 293 459 315 454" class="line" stroke="#67B8C6" stroke-width="1.5" opacity=".8"/>
+    <path d="M295 453Q315 445 336 453M303 460Q318 455 329 460" class="line" stroke="#67B8C6" stroke-width="2"/>
+    <use xlink:href="#water-outline" transform="translate(335 440) scale(.55)" color="#67B8C6"/>
+    <ellipse cx="181" cy="408" rx="13" ry="9" transform="rotate(-22 181 408)" fill="#837262" stroke="#D79B67" stroke-width="1.8"/>
+    <path d="M173 411L187 403" class="line" stroke="#17252F" stroke-width="1.8"/>
+    <!-- 连续活体主路径：加宽强化段、嫩藤、少量分叉。 -->
+    <path d="M181 401C178 370 194 338 230 327C258 317 292 327 327 324" class="line" stroke="#30483B" stroke-width="12"/>
+    <path d="M181 401C178 370 194 338 230 327C258 317 292 327 327 324" class="line" stroke="#6F9E62" stroke-width="6"/>
+    <path d="M181 385L186 374M205 343L217 336M260 324L274 325" class="line" stroke="#B4D184" stroke-width="1.6" opacity=".65"/>
+    <path d="M325 324C368 322 414 339 453 299S468 240 491 221C524 194 552 203 580 188S636 162 687 157C720 153 744 133 754 116" class="line" stroke="#30483B" stroke-width="9"/>
+    <path d="M325 324C368 322 414 339 453 299S468 240 491 221C524 194 552 203 580 188S636 162 687 157C720 153 744 133 754 116" class="line" stroke="#6F9E62" stroke-width="5.5"/>
+    <path d="M354 325C365 299 383 281 406 271M477 243C452 233 430 237 414 216M561 198C570 169 558 157 546 148M637 165C636 136 652 119 674 111M706 151C720 175 744 175 762 166" class="line" stroke="#6F9E62" stroke-width="4"/>
+    <g>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(204 346) rotate(-35) scale(.53)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(254 325) rotate(90) scale(.58)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(384 286) rotate(56) scale(.59)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(406 271) rotate(83) scale(.52)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(414 216) rotate(-40) scale(.52)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(465 278) rotate(118) scale(.5)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(520 206) rotate(100) scale(.56)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(546 148) rotate(-30) scale(.5)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(606 176) rotate(110) scale(.59)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(649 126) rotate(-20) scale(.5)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(674 111) rotate(85) scale(.52)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(738 172) rotate(130) scale(.5)"/>
+      <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(746 131) rotate(50) scale(.43)"/>
+    </g>
+    <path d="M753 117Q746 101 765 95Q768 112 753 117Z" fill="#B4D184"/>
+    <!-- 环抱支点与曾修剪的静态伤痕。 -->
+    <path d="M470 247Q478 252 486 247M470 255Q478 260 486 255M679 151Q686 157 693 151M679 159Q686 165 693 159" class="line" stroke="#E6E0CC" stroke-width="2"/>
+    <path d="M357 325Q360 348 379 355" class="line" stroke="#837262" stroke-width="4"/>
+    <path d="M375 351L381 357" class="line" stroke="#D79B67" stroke-width="3"/>
+    <path d="M359 328Q365 316 371 321Q369 328 359 328Z" fill="#B4D184"/>
+    <!-- 极简界面与设计注释；无虚构系统数值。 -->
+    <rect x="18" y="17" width="246" height="36" rx="4" fill="#17252F" opacity=".86"/>
+    <text x="31" y="41" font-size="15" class="white">普通能量 E　 /　供水 · 需水　 /　感知</text>
+    <text x="24" y="480" font-size="15" class="white">种子 → 根系接水 → 沿家具攀附 → 向窗外生长</text>
+    <path d="M325 277V250H282" class="line" stroke="#E6E0CC" stroke-width="1" opacity=".7"/>
+    <text x="244" y="239" font-size="14" class="white">旧水壶 · 空间记忆</text>
+    <text x="783" y="70" font-size="14" fill="#E7C46A" text-anchor="end">窗光</text>
+    <rect x="676" y="460" width="198" height="27" rx="3" fill="#17252F" opacity=".85"/>
+    <text x="775" y="479" text-anchor="middle" font-size="13" class="white">设计示意，非运行截图</text>
+  </svg>
+
+  <path d="M967 285V831" stroke="#87969C" opacity=".55"/>
+  <text x="992" y="299" class="section">03  形态语法</text>
+  <text x="992" y="323" class="small">圆润接头 · 完整外轮廓 · 同一叶柄接点</text>
+  <g class="line">
+    <path d="M1035 355C1044 378 1030 391 1039 410C1049 432 1037 445 1028 450M1039 404L1016 417M1041 418C1066 425 1067 437 1078 441M1037 378L1055 393" stroke="#837262" stroke-width="4"/>
+    <path d="M1139 448C1177 435 1138 397 1167 375C1176 368 1184 358 1182 351" stroke="#30483B" stroke-width="9"/>
+    <path d="M1139 448C1177 435 1138 397 1167 375C1176 368 1184 358 1182 351" stroke="#6F9E62" stroke-width="6"/>
+    <path d="M1271 449C1307 426 1276 399 1299 374C1308 365 1311 357 1311 353" stroke="#30483B" stroke-width="15"/>
+    <path d="M1271 449C1307 426 1276 399 1299 374C1308 365 1311 357 1311 353" stroke="#6F9E62" stroke-width="9"/>
+    <path d="M1277 441L1285 433M1292 416L1290 404M1297 384L1303 377M1307 365L1308 360" stroke="#B4D184" stroke-width="1.5"/>
+  </g>
+  <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(1463 438) rotate(16) scale(1.02)"/>
+  <circle cx="1463" cy="438" r="4" fill="#E6E0CC" stroke="#17252F" stroke-width="1.5"/>
+  <text x="1044" y="480" text-anchor="middle" class="label">根</text>
+  <text x="1044" y="503" text-anchor="middle" class="small">3～5 px</text><text x="1044" y="521" text-anchor="middle" class="tiny">尖端渐细</text>
+  <text x="1172" y="480" text-anchor="middle" class="label">嫩藤</text>
+  <text x="1172" y="503" text-anchor="middle" class="small">6～9 px</text><text x="1172" y="521" text-anchor="middle" class="tiny">柔和曲线</text>
+  <text x="1304" y="480" text-anchor="middle" class="label">强化枝干</text>
+  <text x="1304" y="503" text-anchor="middle" class="small">10～15 px</text><text x="1304" y="521" text-anchor="middle" class="tiny">双边木纹</text>
+  <text x="1460" y="480" text-anchor="middle" class="label">叶片</text>
+  <text x="1460" y="503" text-anchor="middle" class="small">36～50 px</text><text x="1460" y="521" text-anchor="middle" class="tiny">不对称</text>
+  <text x="992" y="539" class="tiny">尺寸对应 1600×900 参考视口；上方样例为放大观察。</text>
+  <path d="M991 546H1556" stroke="#87969C" opacity=".55"/>
+
+  <text x="992" y="578" class="section">04  状态首先靠形状</text>
+  <text x="992" y="603" class="small">即使灰度或关闭动效，仍可区分；死亡复用枯萎轮廓。</text>
+  <g>
+    <use xlink:href="#leaf-open" x="-65" y="-92" width="92" height="106" transform="translate(1063 708) rotate(10) scale(.85)"/>
+    <use xlink:href="#leaf-wilt" x="-65" y="-92" width="92" height="106" transform="translate(1207 678) scale(.98)"/>
+    <use xlink:href="#leaf-curl" x="-65" y="-92" width="92" height="106" transform="translate(1347 678) scale(1.04)" color="#D79B67"/>
+    <use xlink:href="#leaf-curl" x="-65" y="-92" width="92" height="106" transform="translate(1487 678) scale(1.04)" color="#837262"/>
+    <path d="M1063 708V719M1207 685V719M1347 685V719M1487 685V719" class="line" stroke="#30483B" stroke-width="3"/>
+    <circle cx="1063" cy="718" r="3.5" fill="#B4D184"/>
+    <circle cx="1207" cy="718" r="3.5" fill="#6F9E62"/>
+    <circle cx="1347" cy="718" r="3.5" fill="#D79B67"/>
+    <path d="M1487 703V719" class="line" stroke="#837262" stroke-width="4"/>
+  </g>
+  <text x="1057" y="745" text-anchor="middle" class="label">健康</text>
+  <text x="1197" y="745" text-anchor="middle" class="label">萎蔫</text>
+  <text x="1337" y="745" text-anchor="middle" class="label">枯萎</text>
+  <text x="1477" y="745" text-anchor="middle" class="label">死亡 / 失活</text>
+  <text x="1057" y="769" text-anchor="middle" class="small">张开 · 叶柄支撑</text>
+  <text x="1197" y="769" text-anchor="middle" class="small">下垂 · 叶面收拢</text>
+  <text x="1337" y="769" text-anchor="middle" class="small">卷曲 · 干裂纹</text>
+  <text x="1477" y="769" text-anchor="middle" class="small">灰褐 · 固定姿态</text>
+  <path d="M1013 802L1019 808L1030 792" class="line" stroke="#30483B" stroke-width="2.4"/>
+  <text x="1040" y="807" class="small">完整主脉</text>
+  <use xlink:href="#water-outline" transform="translate(1150 800) scale(.6)" color="#465B68"/>
+  <text x="1166" y="807" class="small">供水不足</text>
+  <use xlink:href="#water-outline" transform="translate(1290 800) scale(.6)" color="#465B68"/>
+  <path d="M1289 793L1293 798L1287 802L1292 807" class="line" stroke="#465B68" stroke-width="1.5"/>
+  <text x="1306" y="807" class="small">正在枯萎</text>
+  <path d="M1421 808Q1417 790 1438 791Q1440 808 1421 808Z M1417 787L1441 811" class="line" stroke="#465B68" stroke-width="1.7"/>
+  <text x="1450" y="807" class="small">已失活</text>
+
+  <path d="M44 853H1556" stroke="#17252F" stroke-width="1.5"/>
+  <text x="44" y="886" class="section">05  操作标记</text>
+  <text x="1556" y="886" text-anchor="end" class="small">形状 + 文本 + 局部颜色　/　禁止只靠红绿区分结果</text>
+  <g>
+    <!-- 支点 -->
+    <path d="M165 920V994" stroke="#87969C" stroke-width="13"/>
+    <path d="M109 981Q129 943 178 947" class="line" stroke="#6F9E62" stroke-width="7"/>
+    <path d="M158 939Q166 944 174 939M158 948Q166 953 174 948" class="line" stroke="#17252F" stroke-width="2.3"/>
+    <use xlink:href="#clamp" transform="translate(227 949)" color="#465B68"/>
+    <text x="44" y="1021" class="label">已攀附</text>
+    <text x="44" y="1046" class="small">两道环抱线；感知时显示固定夹持符号</text>
+    <path d="M408 913V1047" stroke="#87969C" opacity=".5"/>
+    <!-- 修剪 -->
+    <path d="M456 986Q488 973 507 950" class="line" stroke="#6F9E62" stroke-width="8"/>
+    <path d="M507 950Q539 918 586 931M532 936Q543 959 573 964" class="line" stroke="#D79B67" stroke-width="9" opacity=".32"/>
+    <path d="M507 950Q539 918 586 931M532 936Q543 959 573 964" class="line" stroke="url(#hatch-prune)" stroke-width="14"/>
+    <path d="M500 944L512 955" class="line" stroke="#D79B67" stroke-width="4"/>
+    <use xlink:href="#scissors" transform="translate(630 947)" color="#465B68"/>
+    <text x="447" y="1021" class="label">修剪预览</text>
+    <text x="447" y="1046" class="small">整棵后代子树斜线；列边数 / 叶数 / 需水变化</text>
+    <text x="666" y="945" class="tiny">切口亮起</text>
+    <text x="666" y="967" class="tiny">能量返还 0</text>
+    <path d="M809 913V1047" stroke="#87969C" opacity=".5"/>
+    <!-- 合法 -->
+    <circle cx="858" cy="980" r="6" fill="#6F9E62" stroke="#30483B" stroke-width="2"/>
+    <path d="M858 980Q883 927 954 932" class="line" stroke="#30483B" stroke-width="3.5"/>
+    <circle cx="954" cy="932" r="8" fill="none" stroke="#30483B" stroke-width="2"/>
+    <path d="M981 937L987 943L999 927" class="line" stroke="#30483B" stroke-width="2.5"/>
+    <text x="842" y="1021" class="label">合法生长预览</text>
+    <text x="842" y="1046" class="small">实线 + 端点圈 + “可生长”</text>
+    <path d="M1163 913V1047" stroke="#87969C" opacity=".5"/>
+    <!-- 阻挡 -->
+    <path d="M1362 918V990" stroke="#87969C" stroke-width="12"/>
+    <circle cx="1210" cy="980" r="6" fill="#6F9E62" stroke="#30483B" stroke-width="2"/>
+    <path d="M1210 980Q1265 927 1327 939" class="line" stroke="#465B68" stroke-width="3.5" stroke-dasharray="7 7"/>
+    <use xlink:href="#stop" transform="translate(1335 941)" color="#465B68"/>
+    <text x="1390" y="945" class="tiny">路径受阻</text>
+    <text x="1390" y="968" class="tiny">无法穿过家具</text>
+    <text x="1196" y="1021" class="label">受阻生长预览</text>
+    <text x="1196" y="1046" class="small">短断线 + 停止符号 + 明确失败原因</text>
+  </g>
+  <text x="44" y="1081" class="tiny">规范板保留可编辑文字；表现层示例不代替 GDD / TDD 的状态阈值、路径采样与规则。</text>
+  <text x="1556" y="1081" text-anchor="end" class="tiny">Godot 4.7.2 · GDScript · Compatibility　|　不含天气 / 动物 / 嫁接</text>
+</svg>
