@@ -3,7 +3,8 @@ extends RefCounted
 
 static func has_event(state, id: String) -> bool:
 	for event in state.events:
-		if event.get("id", "") == id:
+		var event_id = event.get("id", "")
+		if event_id is String and event_id == id:
 			return true
 	return false
 

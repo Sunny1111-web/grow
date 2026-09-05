@@ -10,6 +10,9 @@ const Model = preload("res://scripts/core/plant_state.gd")
 var state
 var env
 var _committed: Dictionary = {}
+# 拓扑未变时水/结构/光与z无关，缓存复用；产能依赖z每次现算。
+var _solver_cache: Dictionary = {}
+var _solver_cache_key: Array = []
 
 
 func _init(initial_state, environment) -> void:
@@ -73,6 +76,9 @@ func commit(proposal: Dictionary, command_id: String) -> Dictionary:
 		return {"ok": false, "reason": "预览内容已变化，请重新预览"}
 	state = proposal.candidate.clone()
 	state.revision += 1
+	# 强化仅改写kind，不改边数与ID水位；显式失效避免缓存键漏检。
+	_solver_cache = {}
+	_solver_cache_key = []
 	var result: Dictionary = {"ok": true, "reason": "", "kind": proposal.kind,
 		"node": proposal.node, "edge": proposal.edge, "revision": state.revision,
 		"cost": proposal.cost}
@@ -86,9 +92,39 @@ func commit(proposal: Dictionary, command_id: String) -> Dictionary:
 func metrics(plant = null) -> Dictionary:
 	if plant == null:
 		plant = state
-	var water: Dictionary = Water.solve(plant, env.water_contacts(plant))
-	var support: Dictionary = Support.solve(plant)
+	# 缓存仅覆盖正式状态；预览传入候选副本必须全量求解。
+	# 键由拓扑规模、ID水位与应急叶饱和构成：活体z恒低于枯萎阈值，
+	# 其余求解输入只随这些量的变化而变化。
+	var cacheable: bool = plant == state
+	var key: Array = []
+	if cacheable:
+		key = [plant.edges.size(), plant.leaves.size(), plant.next_id,
+			plant.emergency_produced >= 18.0]
+		if not _solver_cache.is_empty() and key == _solver_cache_key:
+			return _assemble_metrics(plant, _solver_cache)
+	# 三个求解器只读植物与环境且互不依赖，worker线程并行；光求解留主线程
+	# 以保持测试替身ray_blocked的调用契约（含查询记录）。
+	var parallel: Array = [{}, {}]
+	var accesses: Array = env.water_contacts(plant)
+	var water_task: int = WorkerThreadPool.add_task(func() -> void:
+		parallel[0] = Water.solve(plant, accesses))
+	var support_task: int = WorkerThreadPool.add_task(func() -> void:
+		parallel[1] = Support.solve(plant))
 	var light: Dictionary = Light.solve(plant, env)
+	WorkerThreadPool.wait_for_task_completion(water_task)
+	WorkerThreadPool.wait_for_task_completion(support_task)
+	var water: Dictionary = parallel[0]
+	var support: Dictionary = parallel[1]
+	if cacheable:
+		_solver_cache = {"water": water, "support": support, "light": light}
+		_solver_cache_key = key
+		return _assemble_metrics(plant, _solver_cache)
+	return _assemble_metrics(plant, {"water": water, "support": support, "light": light})
+
+
+func _assemble_metrics(plant, solvers: Dictionary) -> Dictionary:
+	var water: Dictionary = solvers.water
+	var light: Dictionary = solvers.light
 	var income: float = 0.0
 	var ordinary: float = 0.0
 	for leaf in plant.leaves.values():
@@ -100,7 +136,8 @@ func metrics(plant = null) -> Dictionary:
 			var production: float = 1.6 * light[leaf.id].light * health_factor(leaf.z) * supply
 			ordinary += production
 			income += production
-	return {"water": water, "support": support, "light": light, "income": income, "ordinary_income": ordinary}
+	return {"water": water, "support": solvers.support, "light": light,
+		"income": income, "ordinary_income": ordinary}
 
 
 static func health_factor(z: float) -> float:
