@@ -13,6 +13,9 @@ var _committed: Dictionary = {}
 # 拓扑未变时水/结构/光与z无关，缓存复用；产能依赖z每次现算。
 var _solver_cache: Dictionary = {}
 var _solver_cache_key: Array = []
+# 状态摘要在revision/能量/时钟未变时复用，避免每次预览重复SHA256全状态。
+var _digest_cache: Dictionary = {}
+var _digest_key: Array = []
 
 
 func _init(initial_state, environment) -> void:
@@ -313,10 +316,27 @@ static func _line(a: Vector2, b: Vector2) -> Array:
 	return points
 
 
-static func _digest(plant) -> String:
+func _digest(plant) -> String:
+	if plant == state:
+		var key: Array = [plant.revision, plant.energy, plant.tick, plant.history.size()]
+		if key == _digest_key and not _digest_cache.is_empty():
+			return _digest_cache.hash
+		var value: String = _compute_digest(plant)
+		_digest_cache = {"hash": value}
+		_digest_key = key
+		return value
+	return _compute_digest(plant)
+
+
+static func _compute_digest(plant) -> String:
 	var fields: Dictionary = {}
 	for field in Model.persistent_fields():
-		fields[field] = plant.get(field)
+		if field == "history":
+			# 历史只增不改、不参与命令语义：摘要记录规模而非全部内容，
+			#revision/tick仍随任何追加递增，避免每次摘要序列化整段残枝。
+			fields[field] = plant.history.size()
+		else:
+			fields[field] = plant.get(field)
 	var context = HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
 	context.update(var_to_bytes(fields))

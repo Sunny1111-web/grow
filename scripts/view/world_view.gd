@@ -1,6 +1,9 @@
 extends Node2D
 
 const HistorySlots = preload("res://scripts/view/history_slots.gd")
+const BackgroundLayer = preload("res://scripts/view/background_layer.gd")
+const GrowthLayer = preload("res://scripts/view/growth_layer.gd")
+const OverlayLayer = preload("res://scripts/view/overlay_layer.gd")
 
 var game
 var camera: Vector2 = Vector2(6.5, 1.0)
@@ -8,6 +11,9 @@ var unit_scale: float = 80.0
 var _speckles: Array = []
 var _slots_cache: Dictionary = {"merged": false, "batched_count": 0, "batches": [], "items": []}
 var _slots_history_size: int = -1
+var background_layer
+var growth_layer
+var overlay_layer
 
 const WALL = Color("465b68")
 const DARK = Color("17252f")
@@ -23,6 +29,25 @@ func _ready() -> void:
 	rng.seed = 271828
 	for _i in range(340):
 		_speckles.append([Vector2(rng.randf_range(0, 24), rng.randf_range(-4, 10)), rng.randf_range(0.006, 0.025), rng.randf()])
+	# 分层缓存：背景仅在相机/揭示变化时重绘，植物层与模拟同频10Hz，覆盖层随父每帧。
+	background_layer = BackgroundLayer.new()
+	background_layer.world = self
+	add_child(background_layer)
+	growth_layer = GrowthLayer.new()
+	growth_layer.world = self
+	add_child(growth_layer)
+	overlay_layer = OverlayLayer.new()
+	overlay_layer.world = self
+	add_child(overlay_layer)
+
+
+func _process(delta: float) -> void:
+	if game == null or game.service == null:
+		return
+	_update_history_slots(game.service.state)
+	background_layer.sync()
+	growth_layer.sync()
+	queue_redraw()
 
 
 func to_screen(point: Vector2) -> Vector2:
@@ -88,12 +113,12 @@ func pick_all(screen_point: Vector2, mode: String) -> Array:
 func _draw() -> void:
 	if game.service == null:
 		return
-	_background()
-	var state = game.service.state
-	_atmosphere(state)
 	if game.sensing:
 		_sense()
-	_update_history_slots(state)
+	_preview()
+
+
+func _draw_history(state) -> void:
 	for batch in _slots_cache.batches:
 		var screen_lines: PackedVector2Array = PackedVector2Array()
 		screen_lines.resize(batch.lines.size())
@@ -105,8 +130,14 @@ func _draw() -> void:
 			_polyline(item.data.points, Color(0.51, 0.45, 0.38, 0.28), 0.025)
 		else:
 			_leaf(item.pos, item.data.angle - 0.5, 24.0, 0.3)
+
+
+func _draw_scars(state) -> void:
 	for scar in state.scars.values():
 		draw_arc(to_screen(scar.pos), unit_scale * 0.1, -0.5, 2.8, 12, LOST, 2, true)
+
+
+func _draw_plant(state) -> void:
 	for edge in state.edges.values():
 		var points: Array = edge.points
 		if edge.id == game.growing_edge and game.animation_remaining > 0.0:
@@ -137,9 +168,27 @@ func _draw() -> void:
 			position += Vector2(0, 0.15)
 		var wave: float = sin(Time.get_ticks_msec() * 0.0016 + leaf.id) * 0.025
 		_leaf(position, leaf.angle + wave, leaf.z, 0.45 if leaf.emergency and leaf.produced >= 18.0 else 1.0)
+
+
+func _draw_water_waves(state) -> void:
+	for water in game.service.env.waters:
+		if water.id in state.revealed:
+			var center: Vector2 = water.rect.get_center()
+			var phase: float = Time.get_ticks_msec() * 0.002
+			for wave in range(3):
+				var sway: float = sin(phase + wave * 2.1) * 0.045
+				_line(center + Vector2(-0.2 + sway, wave * 0.08 - 0.08),
+					center + Vector2(0.2 - sway, wave * 0.08 - 0.07), Color(WATER, 0.22), 0.014)
+
+
+func _draw_seed_and_nodes(state) -> void:
 	var seed: Vector2 = state.nodes[state.seed_id].pos
 	draw_circle(to_screen(seed), 0.14 * unit_scale, Color("bfab78"))
 	draw_arc(to_screen(seed), 0.14 * unit_scale, 0.5, 3.2, 12, Color("e6d1a1"), 2.0, true)
+
+
+func _draw_selection() -> void:
+	var state = game.service.state
 	for node in state.nodes.values():
 		if node.emergency:
 			continue
@@ -149,12 +198,9 @@ func _draw() -> void:
 			draw_circle(position, 5.0, BUD)
 		elif game.selected_tool in ["root", "vine", "leaf"]:
 			draw_circle(position, 3.5, Color(BUD, 0.65))
-	_preview()
-	if game.memory_remaining > 0.0:
-		_memory_glow()
 
 
-# 常态氛围层：光区径向光晕与已揭示水源的呼吸波光，纯叠加绘制。
+# 常态氛围层（背景层调用）：光区径向光晕，纯叠加绘制；水波在植物层10Hz重绘。
 func _atmosphere(state) -> void:
 	for fixture in game.service.env.lights:
 		if fixture.id == "ambient" or fixture.intensity < 0.3:
@@ -164,14 +210,6 @@ func _atmosphere(state) -> void:
 		for ring in range(6, 0, -1):
 			draw_circle(to_screen(center), unit_scale * radius * ring / 6.0,
 				Color(LIGHT, 0.011 * fixture.intensity * (7 - ring)))
-	for water in game.service.env.waters:
-		if water.id in state.revealed:
-			var center: Vector2 = water.rect.get_center()
-			var phase: float = Time.get_ticks_msec() * 0.002
-			for wave in range(3):
-				var sway: float = sin(phase + wave * 2.1) * 0.045
-				_line(center + Vector2(-0.2 + sway, wave * 0.08 - 0.08),
-					center + Vector2(0.2 - sway, wave * 0.08 - 0.07), Color(WATER, 0.22), 0.014)
 
 
 func _update_history_slots(state) -> void:

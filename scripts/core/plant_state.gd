@@ -35,7 +35,35 @@ func clone():
 	var result = get_script().new()
 	for field in persistent_fields():
 		var value = get(field)
-		result.set(field, value.duplicate(true) if value is Dictionary or value is Array else value)
+		if field == "nodes":
+			# 节点字段（pos/anchor/kind/emergency）在克隆后从不被改写，浅拷贝隔离即可。
+			var shallow_nodes: Dictionary = {}
+			for id in value:
+				shallow_nodes[id] = value[id].duplicate(false)
+			result.set(field, shallow_nodes)
+		elif field == "edges":
+			# 每边浅字典隔离z/bend/kind等逐tick字段；points数组创建后从不被改写，
+			# 与原状态共享引用，省去每次预览深拷贝数千个曲线点。
+			var shallow_edges: Dictionary = {}
+			for id in value:
+				shallow_edges[id] = value[id].duplicate(false)
+			result.set(field, shallow_edges)
+		elif field == "leaves":
+			var shallow_leaves: Dictionary = {}
+			for id in value:
+				shallow_leaves[id] = value[id].duplicate(false)
+			result.set(field, shallow_leaves)
+		elif value is Dictionary:
+			result.set(field, value.duplicate(true))
+		elif value is Array:
+			# 只增数组（历史/事件/探索/揭示）浅拷贝共享元素：元素从不被改写，
+			# 候选上的追加写入新数组，避免每次预览深拷贝整段历史。
+			if field in ["history", "events", "explored", "revealed"]:
+				result.set(field, value.duplicate(false))
+			else:
+				result.set(field, value.duplicate(true))
+		else:
+			result.set(field, value)
 	return result
 
 
@@ -151,20 +179,26 @@ func validate() -> Array[String]:
 		for field in ["angle", "z", "produced"]:
 			if not is_finite(leaf.get(field, NAN)):
 				errors.append("Invalid leaf scalar")
-	# Each node's parent chain must reach the seed, not an orphan or cycle.
+	# 每个节点的父链必须到达种子：一次从种子出发的遍历即可判定可达性，
+	# 替代逐节点独立爬链的平方成本；不可达即断链或成环。
+	var children_map: Dictionary = {}
+	for id in edges:
+		var parent_node: int = edges[id].a
+		if not children_map.has(parent_node):
+			children_map[parent_node] = [edges[id].b]
+		else:
+			children_map[parent_node].append(edges[id].b)
+	var reachable: Dictionary = {seed_id: true}
+	var pending: Array = [seed_id]
+	while not pending.is_empty():
+		var current: int = pending.pop_back()
+		for child in children_map.get(current, []):
+			if not reachable.has(child):
+				reachable[child] = true
+				pending.append(child)
 	for id in nodes:
-		var visited: Dictionary = {}
-		var current: int = id
-		while current != seed_id:
-			if visited.has(current) or not nodes.has(current):
-				errors.append("Cycle or disconnected component")
-				break
-			visited[current] = true
-			var incoming: int = nodes[current].get("parent_edge", 0)
-			if not edges.has(incoming):
-				errors.append("Disconnected parent chain")
-				break
-			current = edges[incoming].get("a", 0)
+		if not reachable.has(id):
+			errors.append("Cycle or disconnected component")
 	return errors
 
 
