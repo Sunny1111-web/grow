@@ -28,6 +28,7 @@ func sync() -> void:
 func _draw() -> void:
 	if world.game == null or world.game.service == null:
 		return
+	world.brush = self
 	var state = world.game.service.state
 	world._draw_history(state)
 	world._draw_scars(state)

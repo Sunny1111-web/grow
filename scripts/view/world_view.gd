@@ -14,6 +14,8 @@ var _slots_history_size: int = -1
 var background_layer
 var growth_layer
 var overlay_layer
+# 当前绘制目标：层脚本在自身_draw中把brush指向自己，复用world的绘制辅助。
+var brush: CanvasItem = self
 
 const WALL = Color("465b68")
 const DARK = Color("17252f")
@@ -113,9 +115,30 @@ func pick_all(screen_point: Vector2, mode: String) -> Array:
 func _draw() -> void:
 	if game.service == null:
 		return
+	brush = self
 	if game.sensing:
 		_sense()
 	_preview()
+
+
+# 剪叶预览的高亮数据：被剪普通叶的挂点位置，供绘制与测试共用。
+func cut_highlight(proposal: Dictionary) -> Array:
+	var positions: Array = []
+	if not proposal.get("ok", false) or proposal.get("kind", "") != "prune_leaf":
+		return positions
+	var state = game.service.state
+	if state.leaves.has(proposal.target):
+		positions.append(state.nodes[state.leaves[proposal.target].node].pos)
+	return positions
+
+
+# 结构风险累积中的枝条（bend>0即开始吃力），供危险描边与测试共用。
+func danger_edge_ids() -> Array:
+	var result: Array = []
+	for edge in game.service.state.edges.values():
+		if edge.bend > 0.01:
+			result.append(edge.id)
+	return result
 
 
 func _draw_history(state) -> void:
@@ -124,7 +147,7 @@ func _draw_history(state) -> void:
 		screen_lines.resize(batch.lines.size())
 		for i in range(batch.lines.size()):
 			screen_lines[i] = to_screen(batch.lines[i])
-		draw_multiline(screen_lines, Color(0.51, 0.45, 0.38, 0.22), maxf(0.7, 0.03 * unit_scale), true)
+		brush.draw_multiline(screen_lines, Color(0.51, 0.45, 0.38, 0.22), maxf(0.7, 0.03 * unit_scale), true)
 	for item in _slots_cache.items:
 		if item.type == "edge":
 			_polyline(item.data.points, Color(0.51, 0.45, 0.38, 0.28), 0.025)
@@ -134,7 +157,7 @@ func _draw_history(state) -> void:
 
 func _draw_scars(state) -> void:
 	for scar in state.scars.values():
-		draw_arc(to_screen(scar.pos), unit_scale * 0.1, -0.5, 2.8, 12, LOST, 2, true)
+		brush.draw_arc(to_screen(scar.pos), unit_scale * 0.1, -0.5, 2.8, 12, LOST, 2, true)
 
 
 func _draw_plant(state) -> void:
@@ -155,10 +178,13 @@ func _draw_plant(state) -> void:
 			color = color.lerp(LOST, clampf(edge.z / 24.0, 0.0, 1.0))
 		_polyline(points, Color(0.03, 0.08, 0.075, 0.8), width + 0.035)
 		_polyline(points, color, width)
+		if edge.bend > 0.01:
+			# 结构吃力警示：风险累积中的枝叠加暖色描边，与缺水色分开。
+			_polyline(points, Color("d79b67", clampf(edge.bend * 0.4, 0.15, 0.6)), width * 0.4)
 		if edge.kind == "root":
 			_root_hairs(points, color)
 		if not state.nodes[edge.b].anchor.is_empty():
-			draw_arc(to_screen(state.nodes[edge.b].pos), unit_scale * 0.11, 0.2, 5.8, 20, BUD, 2, true)
+			brush.draw_arc(to_screen(state.nodes[edge.b].pos), unit_scale * 0.11, 0.2, 5.8, 20, BUD, 2, true)
 		if game.sensing and game.sim.metrics.water.organs.has(edge.id):
 			var ratio: float = game.sim.metrics.water.organs[edge.id].r
 			_polyline(points, Color(WATER, 0.75 * ratio), 0.018)
@@ -183,8 +209,8 @@ func _draw_water_waves(state) -> void:
 
 func _draw_seed_and_nodes(state) -> void:
 	var seed: Vector2 = state.nodes[state.seed_id].pos
-	draw_circle(to_screen(seed), 0.14 * unit_scale, Color("bfab78"))
-	draw_arc(to_screen(seed), 0.14 * unit_scale, 0.5, 3.2, 12, Color("e6d1a1"), 2.0, true)
+	brush.draw_circle(to_screen(seed), 0.14 * unit_scale, Color("bfab78"))
+	brush.draw_arc(to_screen(seed), 0.14 * unit_scale, 0.5, 3.2, 12, Color("e6d1a1"), 2.0, true)
 
 
 func _draw_selection() -> void:
@@ -194,10 +220,10 @@ func _draw_selection() -> void:
 			continue
 		var position: Vector2 = to_screen(node.pos)
 		if node.id == game.selected_node:
-			draw_arc(position, 0.23 * unit_scale, 0, TAU, 32, Color(BUD, 0.7), 1.5, true)
-			draw_circle(position, 5.0, BUD)
+			brush.draw_arc(position, 0.23 * unit_scale, 0, TAU, 32, Color(BUD, 0.7), 1.5, true)
+			brush.draw_circle(position, 5.0, BUD)
 		elif game.selected_tool in ["root", "vine", "leaf"]:
-			draw_circle(position, 3.5, Color(BUD, 0.65))
+			brush.draw_circle(position, 3.5, Color(BUD, 0.65))
 
 
 # 常态氛围层（背景层调用）：光区径向光晕，纯叠加绘制；水波在植物层10Hz重绘。
@@ -208,7 +234,7 @@ func _atmosphere(state) -> void:
 		var center: Vector2 = fixture.rect.get_center()
 		var radius: float = maxf(fixture.rect.size.x, fixture.rect.size.y) * 0.5
 		for ring in range(6, 0, -1):
-			draw_circle(to_screen(center), unit_scale * radius * ring / 6.0,
+			brush.draw_circle(to_screen(center), unit_scale * radius * ring / 6.0,
 				Color(LIGHT, 0.011 * fixture.intensity * (7 - ring)))
 
 
@@ -222,7 +248,7 @@ func _update_history_slots(state) -> void:
 
 
 func _background() -> void:
-	draw_rect(get_viewport_rect(), Color("17252f"))
+	brush.draw_rect(get_viewport_rect(), Color("17252f"))
 	_rect(Rect2(0, 0.4, 16.0, 9.6), WALL)
 	for index in range(24):
 		_rect(Rect2(0, 0.4 + index * 0.4, 16, 0.4), Color(0.02, 0.06, 0.08, (24 - index) * 0.012))
@@ -248,7 +274,7 @@ func _background() -> void:
 	for speck in _speckles:
 		var point: Vector2 = speck[0]
 		var color: Color = Color(0.55, 0.6, 0.57, 0.09) if point.y > 0.4 else Color(0.56, 0.51, 0.4, 0.12)
-		draw_circle(to_screen(point), maxf(0.6, speck[1] * unit_scale), color)
+		brush.draw_circle(to_screen(point), maxf(0.6, speck[1] * unit_scale), color)
 	for obstacle in game.service.env.obstacles:
 		var color: Color = Color("28393f")
 		if obstacle.id.begins_with("chair"):
@@ -270,13 +296,13 @@ func _background() -> void:
 	# One old watering can — the optional memory object.
 	_polygon([Vector2(8.18, 0.43), Vector2(8.12, 0.94), Vector2(8.62, 0.94), Vector2(8.7, 0.45)], Color("526f70"))
 	_polyline([Vector2(8.67, 0.55), Vector2(8.98, 1.02), Vector2(9.14, 1.08)], Color("526f70"), 0.12)
-	draw_arc(to_screen(Vector2(8.08, 0.73)), unit_scale * 0.24, 1.1, 5.1, 18, Color("526f70"), 0.045 * unit_scale, true)
+	brush.draw_arc(to_screen(Vector2(8.08, 0.73)), unit_scale * 0.24, 1.1, 5.1, 18, Color("526f70"), 0.045 * unit_scale, true)
 	_polyline([Vector2(2.0, -0.8), Vector2(1.94, -0.25), Vector2(2.12, 0.03), Vector2(2.03, 0.39)], Color("080f15"), 0.13)
 	for water in game.service.env.waters:
 		if water.id in game.service.state.revealed:
 			var center: Vector2 = water.rect.get_center()
 			for ring in range(4, 0, -1):
-				draw_circle(to_screen(center), ring * 0.12 * unit_scale, Color(WATER, 0.025 * (5 - ring)))
+				brush.draw_circle(to_screen(center), ring * 0.12 * unit_scale, Color(WATER, 0.025 * (5 - ring)))
 			_line(center + Vector2(-0.22, 0), center + Vector2(0.22, 0.02), Color(WATER, 0.8), 0.05)
 
 
@@ -287,10 +313,10 @@ func _sense() -> void:
 	for surface in game.service.env.surfaces:
 		_line(surface.a, surface.b, Color(BUD, 0.5), 0.025)
 	for point in game.service.state.explored:
-		draw_arc(to_screen(point), unit_scale * 1.2, 0, TAU, 48, Color(WATER, 0.07), 1.0, true)
+		brush.draw_arc(to_screen(point), unit_scale * 1.2, 0, TAU, 48, Color(WATER, 0.07), 1.0, true)
 	for clue in game.service.env.clues:
 		if clue.id in game.service.state.revealed:
-			draw_circle(to_screen(clue.pos), 0.065 * unit_scale, WATER)
+			brush.draw_circle(to_screen(clue.pos), 0.065 * unit_scale, WATER)
 	var selected: Dictionary = game.service.state.nodes.get(game.selected_node, game.service.state.nodes[1])
 	var direction: Vector2 = game.service.env.stimulus(game.service.state, selected.pos, "root" if selected.kind in ["root", "seed"] else "vine")
 	if direction != Vector2.ZERO:
@@ -308,11 +334,13 @@ func _preview() -> void:
 	if proposal.get("points", []).size() > 1:
 		_polyline(proposal.points, Color(color, 0.2), 0.18)
 		_polyline(proposal.points, color, 0.035)
-		draw_arc(to_screen(proposal.points.back()), 0.12 * unit_scale, 0, TAU, 20, color, 1.5, true)
+		brush.draw_arc(to_screen(proposal.points.back()), 0.12 * unit_scale, 0, TAU, 20, color, 1.5, true)
 	if proposal.ok and proposal.kind.begins_with("prune"):
 		for edge in game.service.state.edges.values():
 			if not proposal.candidate.edges.has(edge.id):
 				_polyline(edge.points, Color(0.88, 0.62, 0.38, 0.8), 0.11)
+		for position in cut_highlight(proposal):
+			brush.draw_arc(to_screen(position), 0.3 * unit_scale, 0, TAU, 24, Color("d79b67"), 2.0, true)
 	if proposal.ok and proposal.kind == "leaf":
 		var node: Dictionary = game.service.state.nodes[proposal.target]
 		_leaf(node.pos, game.service.env.light_at(node.pos).direction.angle(), 0, 0.65)
@@ -355,11 +383,11 @@ func _root_hairs(points: Array, color: Color) -> void:
 
 
 func _rect(rect: Rect2, color: Color) -> void:
-	draw_rect(Rect2(to_screen(Vector2(rect.position.x, rect.end.y)), rect.size * unit_scale), color)
+	brush.draw_rect(Rect2(to_screen(Vector2(rect.position.x, rect.end.y)), rect.size * unit_scale), color)
 
 
 func _line(a: Vector2, b: Vector2, color: Color, width: float) -> void:
-	draw_line(to_screen(a), to_screen(b), color, maxf(0.7, width * unit_scale), true)
+	brush.draw_line(to_screen(a), to_screen(b), color, maxf(0.7, width * unit_scale), true)
 
 
 func _polyline(points: Array, color: Color, width: float) -> void:
@@ -368,14 +396,14 @@ func _polyline(points: Array, color: Color, width: float) -> void:
 	var screen: PackedVector2Array = []
 	for point in points:
 		screen.append(to_screen(point))
-	draw_polyline(screen, color, maxf(0.7, width * unit_scale), true)
+	brush.draw_polyline(screen, color, maxf(0.7, width * unit_scale), true)
 
 
 func _polygon(points: Array, color: Color) -> void:
 	var screen: PackedVector2Array = []
 	for point in points:
 		screen.append(to_screen(point))
-	draw_colored_polygon(screen, color)
+	brush.draw_colored_polygon(screen, color)
 
 
 func growth_framing() -> Dictionary:
@@ -393,8 +421,8 @@ func _memory_glow() -> void:
 	var fade: float = minf(1.0, game.memory_remaining) * minf(1.0, (5.0 - game.memory_remaining) * 2.0)
 	var position: Vector2 = game.service.env.memory_position
 	for ring in range(8, 0, -1):
-		draw_circle(to_screen(position + Vector2(0, 0.3)), unit_scale * ring * 0.14, Color(LIGHT, 0.018 * fade))
+		brush.draw_circle(to_screen(position + Vector2(0, 0.3)), unit_scale * ring * 0.14, Color(LIGHT, 0.018 * fade))
 	for drop in range(3):
 		var phase: float = fmod((5.0 - game.memory_remaining) * 0.8 + drop * 0.3, 1.0)
 		var point: Vector2 = position + Vector2(0.6 + phase * 0.2, 0.5 - phase * 0.45)
-		draw_circle(to_screen(point), unit_scale * 0.025, Color(WATER, fade * (1.0 - phase)))
+		brush.draw_circle(to_screen(point), unit_scale * 0.025, Color(WATER, fade * (1.0 - phase)))

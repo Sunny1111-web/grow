@@ -24,6 +24,7 @@ func sync() -> void:
 func _draw() -> void:
 	if world.game == null or world.game.service == null:
 		return
+	world.brush = self
 	world._background()
 	var state = world.game.service.state
 	world._atmosphere(state)

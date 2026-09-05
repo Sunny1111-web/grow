@@ -7,6 +7,7 @@ var world
 func _draw() -> void:
 	if world.game == null or world.game.service == null:
 		return
+	world.brush = self
 	world._draw_selection()
 	if world.game.memory_remaining > 0.0:
 		world._memory_glow()
