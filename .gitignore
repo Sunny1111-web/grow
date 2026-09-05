@@ -5,3 +5,7 @@ builds/
 test-results/
 *.tmp
 docs/design-v1/review/render-*/
+
+__pycache__/
+*.pyc
+docs/**/*.import
