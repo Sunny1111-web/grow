@@ -7,6 +7,7 @@ const Saves = preload("res://scripts/core/save_service.gd")
 const Simulation = preload("res://scripts/core/simulation.gd")
 const World = preload("res://scripts/view/world_view.gd")
 const Hud = preload("res://scripts/view/hud.gd")
+const GameAudio = preload("res://scripts/view/audio.gd")
 
 var service
 var saves
@@ -16,6 +17,7 @@ var commands_since_save: int = 0
 var sim
 var world
 var hud
+var audio
 var selected_tool: String = "root"
 var selected_node: int = 1
 var selected_edge: int = 0
@@ -60,6 +62,8 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.game = self
 	add_child(hud)
+	audio = GameAudio.new()
+	add_child(audio)
 	sim.set_frozen("menu", true)
 	hud.show_title()
 	for argument in OS.get_cmdline_user_args():
@@ -316,6 +320,15 @@ func finish_command() -> void:
 	var result: Dictionary = service.commit(proposal, "%d-%d" % [Time.get_ticks_usec(), command_serial])
 	if result.ok:
 		sim.metrics = service.metrics()
+		match result.kind:
+			"root", "vine", "reinforce":
+				audio.play("grow")
+			"leaf":
+				audio.play("leaf")
+			"prune_edge", "prune_leaf":
+				audio.play("prune")
+			"rescue":
+				audio.play("rescue")
 		selected_node = result.node if service.state.nodes.has(result.node) else 1
 		selected_edge = result.edge
 		growing_edge = result.edge
@@ -418,6 +431,7 @@ func return_to_title() -> void:
 
 func _begin_ending() -> void:
 	_victory_shown = true
+	audio.play("victory")
 	cancel_preview()
 	sim.set_frozen("ending", true)
 	ending_elapsed = 0.0
@@ -438,6 +452,10 @@ func _present_events() -> void:
 			save_progress()
 		elif event.type == "teaching" and memory_remaining <= 0.0:
 			hud.set_message(event.text)
+			if event.get("id", "") == "tutorial_water":
+				audio.play("water")
+		elif event.type in ["drought", "overload", "leaf_drought"]:
+			audio.play("snap")
 	_events_seen = events.size()
 
 

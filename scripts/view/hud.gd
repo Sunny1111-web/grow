@@ -161,10 +161,33 @@ func show_title() -> void:
 func show_pause() -> void:
 	var content = _modal("留一点时间，观察", "根接水，叶获取光能。藤需要支点，也需要持续供水。\n生长不只是向前；修剪能让资源重新抵达重要的枝叶。")
 	content.add_child(_button("继续生长", game.resume_game))
+	content.add_child(_volume_row("整体音量", "Master"))
+	content.add_child(_volume_row("环境声", "Ambience"))
+	content.add_child(_volume_row("动作音效", "SFX"))
 	content.add_child(_button("保存进度  ·  F5", game.save_progress.bind(true)))
 	content.add_child(_button("退守种子…", game.show_rescue))
 	content.add_child(_button("保存并退出", game.request_quit))
 	content.add_child(_label("1 根 · 2 藤 · 3 叶 · 4 强化\n空格感知 · Shift 修剪 · F 催生\n中键平移 · 滚轮缩放 · Home 回到选中点", 16, PAPER))
+
+
+func _volume_row(label_text: String, bus_name: String) -> HBoxContainer:
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 18)
+	var label = _label(label_text, 16, PAPER)
+	label.custom_minimum_size = Vector2(116, 0)
+	row.add_child(label)
+	var slider = HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.05
+	slider.value = game.audio.volume(bus_name)
+	slider.custom_minimum_size = Vector2(300, 0)
+	slider.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	slider.value_changed.connect(func(value: float) -> void:
+		game.audio.set_volume(bus_name, value)
+		game.audio.save_settings())
+	row.add_child(slider)
+	return row
 
 
 func show_rescue() -> void:

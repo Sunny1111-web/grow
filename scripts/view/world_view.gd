@@ -90,6 +90,7 @@ func _draw() -> void:
 		return
 	_background()
 	var state = game.service.state
+	_atmosphere(state)
 	if game.sensing:
 		_sense()
 	_update_history_slots(state)
@@ -151,6 +152,26 @@ func _draw() -> void:
 	_preview()
 	if game.memory_remaining > 0.0:
 		_memory_glow()
+
+
+# 常态氛围层：光区径向光晕与已揭示水源的呼吸波光，纯叠加绘制。
+func _atmosphere(state) -> void:
+	for fixture in game.service.env.lights:
+		if fixture.id == "ambient" or fixture.intensity < 0.3:
+			continue
+		var center: Vector2 = fixture.rect.get_center()
+		var radius: float = maxf(fixture.rect.size.x, fixture.rect.size.y) * 0.5
+		for ring in range(6, 0, -1):
+			draw_circle(to_screen(center), unit_scale * radius * ring / 6.0,
+				Color(LIGHT, 0.011 * fixture.intensity * (7 - ring)))
+	for water in game.service.env.waters:
+		if water.id in state.revealed:
+			var center: Vector2 = water.rect.get_center()
+			var phase: float = Time.get_ticks_msec() * 0.002
+			for wave in range(3):
+				var sway: float = sin(phase + wave * 2.1) * 0.045
+				_line(center + Vector2(-0.2 + sway, wave * 0.08 - 0.08),
+					center + Vector2(0.2 - sway, wave * 0.08 - 0.07), Color(WATER, 0.22), 0.014)
 
 
 func _update_history_slots(state) -> void:
