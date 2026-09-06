@@ -46,3 +46,8 @@
 - 分关存档持久化与视图跨关刷新：章节解锁重启保留、各代存档回退、绘制缓存串关修复（test_chapter_persistence / test_chapter_view）。
 - 新工具：balcony_runner.gd（阳台真实路线执行器）、capture_balcony.gd + Invoke-Tests.ps1 -BalconyWindow（上下两路真实鼠标回放：均 won=true, reloaded=true，run-20260906-103453-242-3956ef）。
 - 文档：README/项目版本号至0.1.2；补写 reports/2026-09-06-balcony-chapters.md（本轮验证报告）。全套8617断言通过，检查器26项全过；美术与真人试玩留人工清单。本轮发布包与报告此前未随代码落地，已由本轮补齐（导出build/grow-0.1.2-windows并提交）。
+
+2026-09-06 用户反馈两修复 + 远程仓库：
+- 拖拽预览不可见：预览/感知绘制原挂在 world_view 父节点，被背景/植物/覆盖三个子层（Godot 子层后绘）完全遮盖——自0.1.0分层渲染起预览实际从未显示。移至最顶层 overlay_layer（每帧重绘）后恢复；world_view 自身不再每帧 queue_redraw。探针实证：修复前截图无曲线、修复后绿色预览曲线+端点环清晰可见（test-results/probe-preview2）。
+- 暂停菜单设置页溢出：v0.1.1 新增三行设置后面板高度超出屏幕。_modal 改为 ScrollContainer 包裹并按视口82%封顶（延迟测量内容最小高度），行距24→14；截图确认完整可滚动无溢出（pause_overflow=false）。
+- 远程仓库：添加 origin=https://github.com/Sunny1111-web/grow.git 并推送 master 建立跟踪；后续每阶段提交后同步推送。全套8617断言通过，Opening窗口回放通过。

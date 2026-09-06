@@ -1,6 +1,7 @@
 extends Node2D
 
-# 轻量覆盖层：选中环、工具点与记忆光。随父级每帧重绘，调用数极少。
+# 最顶层覆盖：选中环、工具点、记忆光、感知与生长预览。
+# 预览/感知必须画在这一层：父节点自身的绘制会被背景/植物子层盖住。
 var world
 
 
@@ -15,3 +16,6 @@ func _draw() -> void:
 	world._draw_selection()
 	if world.game.memory_remaining > 0.0:
 		world._memory_glow()
+	if world.game.sensing:
+		world._sense()
+	world._preview()

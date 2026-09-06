@@ -50,7 +50,6 @@ func _process(delta: float) -> void:
 	_update_history_slots(game.service.state)
 	background_layer.sync()
 	growth_layer.sync()
-	queue_redraw()
 
 
 func to_screen(point: Vector2) -> Vector2:
@@ -132,12 +131,7 @@ func pick_all(screen_point: Vector2, mode: String) -> Array:
 
 
 func _draw() -> void:
-	if game.service == null:
-		return
-	brush = self
-	if game.sensing:
-		_sense()
-	_preview()
+	pass
 
 
 # 剪叶预览的高亮数据：被剪普通叶的挂点位置，供绘制与测试共用。

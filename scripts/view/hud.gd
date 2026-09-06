@@ -334,15 +334,30 @@ func _modal(title: String, body: String) -> VBoxContainer:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	modal.add_child(center)
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(680, 0)
+	panel.custom_minimum_size = Vector2(680 * game.ui_scale, 0)
 	panel.add_theme_stylebox_override("panel", _box(Color("17252f"), 16, Color("465b68"), 36))
 	center.add_child(panel)
+	# 内容超出屏幕（如设置项较多的暂停菜单）时在面板内滚动，高度不超过视口82%。
+	var scroll = ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
 	var content = VBoxContainer.new()
-	content.add_theme_constant_override("separation", 24)
-	panel.add_child(content)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 14)
+	scroll.add_child(content)
+	_cap_modal_height.call_deferred(scroll)
 	content.add_child(_label(title, 38, GREEN))
 	content.add_child(_label(body, 19, PAPER))
 	return content
+
+
+func _cap_modal_height(scroll: ScrollContainer) -> void:
+	if not is_instance_valid(scroll) or scroll.get_child_count() == 0:
+		return
+	var content: Control = scroll.get_child(0)
+	var needed: float = content.get_combined_minimum_size().y
+	var limit: float = root.get_viewport_rect().size.y * 0.82 - 72.0
+	scroll.custom_minimum_size.y = maxf(200.0, minf(needed, limit))
 
 
 func _label(text: String, size: int, color: Color) -> Label:
