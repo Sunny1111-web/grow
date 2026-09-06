@@ -144,6 +144,7 @@ func _build_guide_card() -> void:
 	root.add_child(guide_holder)
 	guide_panel = PanelContainer.new()
 	guide_panel.custom_minimum_size = Vector2(640, 0)
+	guide_panel.visible = false
 	guide_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	guide_panel.add_theme_stylebox_override("panel", _box(Color(0.05, 0.09, 0.11, 0.95), 14, GREEN, 18))
 	guide_holder.add_child(guide_panel)
