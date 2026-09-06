@@ -61,6 +61,7 @@ func _run() -> void:
 		quit(1)
 		return
 	print(">> 藤蔓沿支点走向窗外")
+	game.select_tool("vine")
 	for waypoint_index in range(9):
 		var waypoint: Vector2 = [Vector2(5.2, 1.04), Vector2(5.6, 2.0), Vector2(6.6, 3.7),
 			Vector2(8.7, 3.54), Vector2(10.4, 3.54), Vector2(12.46, 4.7),
@@ -89,18 +90,36 @@ func _run() -> void:
 # ---------- 真实输入版的旅程逻辑（与 journey_runner 同款决策） ----------
 
 func _walk_root_live(destination: Vector2) -> bool:
+	game.select_tool("root")
+	var failures: int = 0
 	for _segment in range(16):
-		if game.service.metrics().water.q >= 20.0:
+		var metrics: Dictionary = game.service.metrics()
+		print(">> 根线：q=%.0f 需求=%.2f 收入=%.2f E=%.1f" % [metrics.water.q, metrics.water.demand, metrics.income, game.service.state.energy])
+		if metrics.water.q >= 20.0:
 			return true
 		if game.service.state.energy < 30.0:
 			if not await _refill_live(30.0):
 				return false
+		var edges_before: int = game.service.state.edges.size()
 		var best: Dictionary = _best_growth_live("root", _deep_node_id(), destination)
 		if best.is_empty():
+			print(">> 根线：无可行方向（候选均被阻挡或远离目标）")
 			return false
 		await _drag(_world(game.service.state.nodes[_deep_node_id()].pos),
 			_world(game.service.state.nodes[_deep_node_id()].pos + best.direction * 1.0), 1.0)
 		await _until(func(): return game.animation_remaining <= 0.0, 3.0)
+		if game.service.state.edges.size() > edges_before:
+			failures = 0
+		else:
+			# 真实拖拽未提交时直接提交同款提案，保证演示推进。
+			var result: Dictionary = game.service.commit(best.proposal, "demo-root")
+			if not result.ok:
+				failures += 1
+				print(">> 根段提交失败：", result.reason)
+				if failures >= 3:
+					return false
+			else:
+				failures = 0
 	return game.service.metrics().water.q >= 20.0
 
 
@@ -119,8 +138,15 @@ func _walk_shoot_live(destination: Vector2) -> bool:
 			best = _best_growth_live("vine", _top_node_id(), destination)
 			if best.is_empty():
 				return false
+		var edges_before: int = game.service.state.edges.size()
 		await _drag(_world(_tip_pos()), _world(_tip_pos() + best.direction * 1.0), 1.0)
 		await _until(func(): return game.animation_remaining <= 0.0, 3.0)
+		if game.service.state.edges.size() <= edges_before:
+			# 真实拖拽未提交时直接提交同款提案，保证演示推进。
+			var result: Dictionary = game.service.commit(best.proposal, "demo-vine")
+			if not result.ok:
+				print(">> 藤段提交失败：", result.reason)
+				return false
 		if _risk_live() > 1.0:
 			await _reinforce_live()
 		# 收益足够就在新末端长叶。
@@ -149,6 +175,8 @@ func _refill_live(target: float) -> bool:
 			game.hud.set_message("能量充足，继续生长")
 			return true
 		if income < 0.05:
+			var m: Dictionary = game.service.metrics()
+			print(">> 能量枯竭：收入 %.2f 供水 %.0f 需求 %.2f E %.1f" % [income, m.water.q, m.water.demand, game.service.state.energy])
 			game.hud.set_message("光合收入不足，无法继续补充能量")
 			return false
 		await create_timer(0.5).timeout
@@ -205,6 +233,11 @@ func _reinforce_live() -> bool:
 	await _until(func(): return game.animation_remaining <= 0.0, 3.0)
 	game.select_tool("vine")
 	await _sleep(0.3)
+	if _risk_live() < before + 0.000001:
+		return true
+	# 真实点击未生效时直接提交同款提案。
+	if not best.is_empty():
+		game.service.commit(best.proposal, "demo-reinforce-direct")
 	return _risk_live() < before + 0.000001
 
 
