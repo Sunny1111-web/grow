@@ -18,6 +18,15 @@ const STEPS: Array = [
 		"help": "叶片只在有光的区域有效；叶尖朝向由光照方向决定。长叶后就能积攒能量强化或修剪。"}]
 
 const IDLE_HELP_SECONDS: float = 45.0
+# 每步对应的工具（用于工具栏按钮提示），与 STEPS 一一对应。
+const STEP_TOOLS: Array = ["root", "root", "vine", "vine", "leaf"]
+# 步骤推进时引导卡的强调反馈语；5 为教学完成。
+const STEP_FLASH: Dictionary = {
+	1: "✓ 选好了，开始拖根",
+	2: "✓ 根接到水了！",
+	3: "✓ 藤长出来了",
+	4: "✓ 缠住支点了",
+	5: "✓ 叶片开始供能，教学完成！"}
 
 
 # 每帧驱动：推进步序并返回当前提示。changed 表示步序发生推进。

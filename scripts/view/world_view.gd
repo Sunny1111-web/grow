@@ -279,6 +279,23 @@ func _draw_selection() -> void:
 			brush.draw_circle(position, 3.5, Color(BUD, 0.65))
 
 
+# 引导目标世界提示：教学前两步（选中种子/拖根）在种子外画呼吸金圈。
+func _draw_guide_hint() -> void:
+	if not game.guide_active:
+		return
+	var step: int = int(game.service.state.guide.get("step", 0))
+	if step > 1:
+		return
+	var state = game.service.state
+	var position: Vector2 = to_screen(state.nodes[state.seed_id].pos)
+	if game.low_motion:
+		brush.draw_arc(position, 0.34 * unit_scale, 0, TAU, 32, Color(LIGHT, 0.55), 2.0, true)
+		brush.draw_arc(position, 0.46 * unit_scale, 0, TAU, 32, Color(LIGHT, 0.3), 1.5, true)
+		return
+	var pulse: float = 0.34 + 0.09 * sin(Time.get_ticks_msec() / 1000.0 * 3.2)
+	brush.draw_arc(position, pulse * unit_scale, 0, TAU, 32, Color(LIGHT, 0.8), 2.5, true)
+
+
 # 常态氛围层（背景层调用）：光区径向光晕，纯叠加绘制；低动态时单圈淡光。
 func _atmosphere(state) -> void:
 	for fixture in game.service.env.lights:

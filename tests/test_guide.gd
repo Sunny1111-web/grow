@@ -27,13 +27,20 @@ func _step_progression(t) -> void:
 	var result: Dictionary = Guide.evaluate(game)
 	t.check(result.active and result.step == 0, "开局处于第0步且引导激活")
 	game._update_guide(0.1)
-	t.check(game.guide_message == Guide.STEPS[0].text, "HUD 引导文案为当前步骤")
+	t.check(game.guide_message == Guide.STEPS[0].text, "引导文案为当前步骤")
+	t.check(game.hud.guide_panel.visible, "引导卡可见")
+	t.check(game.hud.guide_text_label.text == Guide.STEPS[0].text, "引导卡显示当前任务")
+	t.check(game.hud.guide_step_label.text.contains("1 / 5"), "引导卡显示步骤进度")
 	# 第0步：选中种子并开始拖根。
 	game.selected_node = 1
 	game.selected_tool = "root"
 	game.dragging = true
 	result = Guide.evaluate(game)
 	t.check(result.step == 1, "开始拖根推进到第1步")
+	game._update_guide(0.1)
+	t.check(game.hud.guide_text_label.text == Guide.STEP_FLASH[1], "步进瞬间引导卡显示强调反馈")
+	game._update_guide(3.0)
+	t.check(game.hud.guide_text_label.text == Guide.STEPS[1].text, "反馈后回到步骤说明")
 	game.dragging = false
 	# 第1步：长出第一段根。
 	var state = game.service.state
@@ -56,6 +63,10 @@ func _step_progression(t) -> void:
 	var leaf: int = state.add_leaf(state.edges[vine].b)
 	result = Guide.evaluate(game)
 	t.check(not result.active and result.step >= Guide.STEPS.size(), "长叶后教学完成退出提示")
+	game._update_guide(0.1)
+	t.check(game.hud.guide_panel.visible and game.hud.guide_text_label.text == Guide.STEP_FLASH[5], "完成瞬间引导卡显示完成反馈")
+	game._update_guide(4.0)
+	t.check(not game.hud.guide_panel.visible, "反馈结束后引导卡收起")
 	game.free()
 
 
@@ -78,10 +89,13 @@ func _idle_help(t) -> void:
 	game.idle_time = Guide.IDLE_HELP_SECONDS + 1.0
 	game._update_guide(0.1)
 	t.check(game.service.state.guide.get("helped", false), "长时间无进展追加帮助并记录")
-	t.check(game.message_hold > 0.0, "追加帮助持有消息展示期")
+	t.check(game.hud.guide_text_label.text.contains("\n"), "追加帮助进入引导卡")
 	game.idle_time = 0.0
 	game._update_guide(0.1)
-	t.check(game.guide_message.find("\n") == -1, "帮助只追加一次，不重复堆叠")
+	t.check(game.hud.guide_text_label.text.find("\n", 0) == -1 or game.hud.guide_text_label.text == game.guide_message, "帮助只追加一次，不重复堆叠")
+	# 工具按钮提示映射与步骤对应。
+	t.check(Guide.STEP_TOOLS.size() == Guide.STEPS.size(), "每步都有工具提示映射")
+	t.check(Guide.STEP_TOOLS[2] == "vine" and Guide.STEP_TOOLS[4] == "leaf", "长藤/长叶步骤映射正确工具")
 	game.free()
 
 

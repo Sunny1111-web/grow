@@ -54,6 +54,9 @@ var guide_active: bool = false
 var message_hold: float = 0.0
 var idle_time: float = 0.0
 var _guide_helped: bool = false
+var _guide_last_step: int = -1
+var guide_flash_text: String = ""
+var guide_flash_time: float = 0.0
 # 设置（经 audio 的 ConfigFile 持久化）：界面缩放、感知切换、低动态。
 var ui_scale: float = 1.0
 var sensing_toggle: bool = false
@@ -232,6 +235,10 @@ func _activate_state(plant, env = null) -> void:
 	guide_message = ""
 	guide_active = false
 	_guide_helped = false
+	_guide_last_step = -1
+	guide_flash_text = ""
+	guide_flash_time = 0.0
+	hud.hide_guide()
 	idle_time = 0.0
 	world.camera = Vector2(6.5, 1.0)
 	world.unit_scale = 80.0
@@ -280,18 +287,16 @@ func _process(delta: float) -> void:
 			_begin_ending()
 	_update_guide(delta)
 	_present_events()
-	if guide_active and message_hold <= 0.0 and guide_message != "":
-		hud.set_message(guide_message)
 	_update_presentation(delta)
 	hud.refresh()
-	world.queue_redraw()
 	if _capture_path != "":
 		_capture_frames += 1
 		if _capture_frames == 8:
 			_capture.call_deferred()
 
 
-# 引导文案与「长时间无进展」的追加帮助。事件文案持有期不覆盖。
+# 引导卡驱动：步进时给出强调反馈；「长时间无进展」追加帮助进卡内。
+# 事件文案持有期不覆盖（message_hold 管底部消息，引导卡独立显示）。
 func _update_guide(delta: float) -> void:
 	if not started or sim.frozen.has("menu"):
 		return
@@ -299,17 +304,33 @@ func _update_guide(delta: float) -> void:
 	guide_active = result.active
 	guide_message = result.message
 	_guide_helped = service.state.guide.get("helped", false)
+	if guide_flash_time > 0.0:
+		guide_flash_time = maxf(0.0, guide_flash_time - delta)
+	var step: int = result.step
+	if step != _guide_last_step and step > _guide_last_step and Guide.STEP_FLASH.has(step):
+		guide_flash_text = str(Guide.STEP_FLASH[step])
+		guide_flash_time = 2.2 if step < Guide.STEPS.size() else 3.2
+	_guide_last_step = step
 	if guide_active:
 		idle_time += delta
-		if idle_time >= Guide.IDLE_HELP_SECONDS and not _guide_helped:
+		var shown: String = guide_message
+		var highlighted := false
+		if guide_flash_time > 0.0 and guide_flash_text != "":
+			shown = guide_flash_text
+			highlighted = true
+		elif idle_time >= Guide.IDLE_HELP_SECONDS and not _guide_helped:
 			var help: String = Guide.request_help(self)
 			if help != "":
-				guide_message = guide_message + "\n" + help
-				message_hold = 8.0
-				hud.set_message(guide_message)
-	elif not guide_message.is_empty() or idle_time > 0.0:
-		guide_message = ""
-		idle_time = 0.0
+				shown = shown + "\n" + help
+		hud.set_guide(shown, step, Guide.STEPS.size(), highlighted)
+	elif guide_flash_time > 0.0 and guide_flash_text != "":
+		# 教学完成：反馈语短暂驻留后收起引导卡。
+		hud.set_guide(guide_flash_text, Guide.STEPS.size(), Guide.STEPS.size(), true)
+	else:
+		hud.hide_guide()
+		if not guide_message.is_empty() or idle_time > 0.0:
+			guide_message = ""
+			idle_time = 0.0
 
 
 func _capture() -> void:

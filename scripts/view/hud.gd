@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const Levels = preload("res://scripts/core/levels.gd")
+const Guide = preload("res://scripts/core/guide.gd")
 
 var game
 var chapter_title_label: Label
@@ -16,10 +17,16 @@ var energy_bar: ProgressBar
 var modal: Control
 var tool_buttons: Dictionary = {}
 var sense_button: Button = null
+var guide_holder: Control = null
+var guide_panel: PanelContainer = null
+var guide_step_label: Label = null
+var guide_text_label: Label = null
+var _guide_pulse: float = 0.0
 
 const PAPER = Color("e6e0cc")
 const GREEN = Color("b4d184")
 const INK = Color("17252f")
+const LIGHT = Color("e7c46a")
 
 
 func _ready() -> void:
@@ -123,6 +130,60 @@ func _build() -> void:
 	detail.add_child(preview_label)
 	mode_label = _label("空格 感知  ·  Shift 修剪  ·  F 催生  ·  中键 平移  ·  滚轮 缩放", 13, Color("87969c"))
 	detail.add_child(mode_label)
+	_build_guide_card()
+
+
+# 引导激活期间的显眼提示卡：顶部居中，步骤进度点 + 大字任务文本，
+# 呼吸脉动吸引注意（低动态设置下静止）。
+func _build_guide_card() -> void:
+	guide_holder = CenterContainer.new()
+	guide_holder.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	guide_holder.offset_top = 84
+	guide_holder.offset_bottom = 220
+	guide_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(guide_holder)
+	guide_panel = PanelContainer.new()
+	guide_panel.custom_minimum_size = Vector2(640, 0)
+	guide_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	guide_panel.add_theme_stylebox_override("panel", _box(Color(0.05, 0.09, 0.11, 0.95), 14, GREEN, 18))
+	guide_holder.add_child(guide_panel)
+	var guide_box = VBoxContainer.new()
+	guide_box.add_theme_constant_override("separation", 6)
+	guide_panel.add_child(guide_box)
+	guide_step_label = _label("", 15, Color("9fb8bd"))
+	guide_step_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	guide_box.add_child(guide_step_label)
+	guide_text_label = _label("", 21, GREEN)
+	guide_text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	guide_text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	guide_box.add_child(guide_text_label)
+
+
+func _process(delta: float) -> void:
+	if guide_panel != null and guide_panel.visible and game != null and not game.low_motion:
+		_guide_pulse += delta
+		guide_panel.modulate.a = 0.8 + 0.2 * absf(sin(_guide_pulse * 2.4))
+
+
+# 引导卡内容；highlight 为步骤推进时的强调反馈。
+func set_guide(text: String, step: int, total: int, highlighted: bool = false) -> void:
+	if guide_panel == null:
+		return
+	guide_panel.visible = true
+	var dots: String = ""
+	for index in range(total):
+		dots += "● " if index <= step else "○ "
+	guide_step_label.text = "新手引导  ·  第 %d / %d 步    %s" % [mini(step + 1, total), total, dots.strip_edges()]
+	guide_text_label.text = text
+	guide_text_label.add_theme_color_override("font_color", LIGHT if highlighted else GREEN)
+	guide_panel.modulate.a = 1.0 if game.low_motion else guide_panel.modulate.a
+
+
+func hide_guide() -> void:
+	if guide_panel != null:
+		guide_panel.visible = false
+		guide_panel.modulate.a = 1.0
+	_guide_pulse = 0.0
 
 
 func refresh() -> void:
@@ -140,6 +201,13 @@ func refresh() -> void:
 	_update_selection_line(state, metrics)
 	for tool in tool_buttons:
 		tool_buttons[tool].modulate = GREEN if tool == game.selected_tool else PAPER
+	# 引导进行中：当前步骤需要的工具按钮用暖色提示（已选中则保持绿色）。
+	if game.guide_active and game.service != null:
+		var step: int = int(game.service.state.guide.get("step", 0))
+		if step < Guide.STEP_TOOLS.size():
+			var hinted: String = Guide.STEP_TOOLS[step]
+			if tool_buttons.has(hinted) and game.selected_tool != hinted:
+				tool_buttons[hinted].modulate = LIGHT
 	if sense_button != null:
 		sense_button.modulate = GREEN if game.sensing else PAPER
 	var proposal: Dictionary = game.proposal

@@ -14,6 +14,7 @@ func _draw() -> void:
 		return
 	world.brush = self
 	world._draw_selection()
+	world._draw_guide_hint()
 	if world.game.memory_remaining > 0.0:
 		world._memory_glow()
 	if world.game.sensing:
