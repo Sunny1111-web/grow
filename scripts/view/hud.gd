@@ -3,6 +3,7 @@ extends CanvasLayer
 const Levels = preload("res://scripts/core/levels.gd")
 
 var game
+var chapter_title_label: Label
 var root: Control
 var energy_label: Label
 var water_label: Label
@@ -58,7 +59,8 @@ func _build() -> void:
 	top.add_child(brand)
 	var level_title: String = str(game.service.env.title) if game.service != null else ""
 	brand.add_child(_label("G R O W", 30, PAPER))
-	brand.add_child(_label("向 光 而 生  /  " + level_title, 13, Color("87969c")))
+	chapter_title_label = _label("向 光 而 生  /  " + level_title, 13, Color("87969c"))
+	brand.add_child(chapter_title_label)
 	var resource_panel = PanelContainer.new()
 	resource_panel.custom_minimum_size = Vector2(360 * game.ui_scale, 0)
 	resource_panel.add_theme_stylebox_override("panel", _box(Color(0.065, 0.1, 0.12, 0.94), 8, Color("465b68"), 10))
@@ -201,35 +203,37 @@ func close_modal() -> void:
 	modal = null
 
 
+func refresh_chapter_title() -> void:
+	if is_instance_valid(chapter_title_label):
+		chapter_title_label.text = "向 光 而 生  /  " + str(game.service.env.title)
+
+
+func show_chapter_error(reason: String) -> void:
+	var content = _modal("暂时无法进入这一章", reason + "\n已有进度仍然保留。")
+	content.add_child(_button("返回章节列表", game.return_to_title))
+
+
 func show_title() -> void:
-	var content = _modal("向 光 而 生", "一颗种子，落在无人居住的房间。\n伸出根，触碰水。沿着遗留的家具，寻找窗外的光。\n\n你长出的身体，就是你走过的路。")
+	var content = _modal("向 光 而 生", "从无人居住的房间，向断裂的阳台伸展。\n你长出的身体，就是你走过的路。")
 	for definition in Levels.ordered():
-		var unlocked: bool = Levels.is_unlocked(definition.id)
-		if not unlocked:
-			content.add_child(_label("%s  ·  通关上一章后解锁" % definition.title, 15, Color("5c6b70")))
+		if not game.is_chapter_unlocked(definition.id):
+			content.add_child(_label("%s  ·  通关上一章后解锁" % definition.title, 17, Color("87969c")))
 			continue
+		var chapter_status: Dictionary = game.chapter_status(definition.id)
 		var row = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
 		content.add_child(row)
-		var chapter_saves = load("res://scripts/core/save_service.gd").new(Levels.save_dir_for(definition.id), definition.id)
-		var chapter_status: Dictionary = chapter_saves.load_latest()
 		row.add_child(_label(definition.title, 17, PAPER))
-		if chapter_status.ok:
+		if chapter_status.get("found", false) and not chapter_status.ok:
+			var warning = _label(chapter_status.reason, 15, Color("d79b67"))
+			warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			content.add_child(warning)
+		elif chapter_status.ok:
 			row.add_child(_button("继续", game.continue_game.bind(definition.id)))
 			row.add_child(_button("重新开始", game.start_new_game.bind(definition.id)))
-		elif definition.id == game.level_id:
-			row.add_child(_button("开始生长", game.start_new_game.bind(definition.id)))
 		else:
-			row.add_child(_button("开始", game.start_new_game.bind(definition.id)))
-		if chapter_status.get("future_version", false):
-			row.add_child(_label(chapter_status.reason, 13, Color("d79b67")))
-	if game.load_status.get("ok", false) and game.level_id == Levels.APARTMENT:
-		content.add_child(_button("继续上次的生长", game.continue_game.bind(Levels.APARTMENT)))
-	elif game.load_status.get("found", false):
-		var notice = _label(game.load_status.reason, 15, Color("d79b67"))
-		notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		content.add_child(notice)
-		content.add_child(_button("开始新的生长", game.start_new_game.bind(game.level_id)))
+			row.add_child(_button("开始生长", game.start_new_game.bind(definition.id)))
+	content.add_child(_label("每章独立保存；重玩前一章不会收回已经解锁的章节。", 15, Color("87969c")))
 	content.add_child(_label("拖拽引导生长  /  预览时暂停  /  随时可以退守种子", 14, Color("87969c")))
 
 
@@ -244,6 +248,7 @@ func show_pause() -> void:
 	content.add_child(_button("退守种子…", game.show_rescue))
 	content.add_child(_button("重看本步引导", game.replay_guide_hint))
 	content.add_child(_button("跳过引导", game.skip_guide))
+	content.add_child(_button("保存并返回章节列表", game.return_to_title))
 	content.add_child(_button("保存并退出", game.request_quit))
 	content.add_child(_label("1 根 · 2 藤 · 3 叶 · 4 强化\n空格感知 · Shift 修剪 · F 催生\n中键平移 · 滚轮缩放 · Home 回到选中点", 16, PAPER))
 
@@ -301,11 +306,17 @@ func _settings_rows() -> VBoxContainer:
 func show_rescue() -> void:
 	var content = _modal("回到那颗种子", "当前能量归零，所有普通枝叶退为残痕。\n探索和记忆会留下。种子恢复两条固定根和一片应急子叶，\n子叶最多提供 18 能量，足够重新长出三段藤和一片叶。")
 	content.add_child(_button("确认退守", game.confirm_rescue))
+	var next: String = game.next_chapter()
+	if next != "":
+		content.add_child(_button("进入" + str(Levels.get_definition(next).title), game.open_next_chapter))
 	content.add_child(_button("继续观察", game.resume_game))
 
 
 func show_victory() -> void:
 	var content = _modal("G R O W  ·  向光而生", "你从地板下醒来，借着旧物，长成了自己的路。\n那些剪去的枝、留下的伤口，也成为这株植物的一部分。\n\n" + str(game.service.env.title) + "  完成")
+	var next: String = game.next_chapter()
+	if next != "":
+		content.add_child(_button("进入" + str(Levels.get_definition(next).title), game.open_next_chapter))
 	content.add_child(_button("继续观察", game.resume_game))
 	content.add_child(_button("返回标题", game.return_to_title))
 

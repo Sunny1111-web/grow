@@ -68,6 +68,12 @@ func run(t) -> void:
 
 func _malformed_payloads(t, save_type, directory: String, sample_path: String) -> void:
 	var mutations: Array = [
+		func(data): data.history = [123],
+		func(data): data.events = [123],
+		func(data): data.scars = {"bad": 123},
+		func(data): data.explored = [123],
+		func(data): data.revealed = [123],
+		func(data): data.history = [{"type": "edge", "data": 123}],
 		func(data): data.nodes = {"1": 123},
 		func(data): data.edges.values()[0].a = 9999,
 		func(data): data.energy = -1,

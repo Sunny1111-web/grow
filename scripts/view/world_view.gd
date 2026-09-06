@@ -11,6 +11,7 @@ var unit_scale: float = 80.0
 var _speckles: Array = []
 var _slots_cache: Dictionary = {"merged": false, "batched_count": 0, "batches": [], "items": []}
 var _slots_history_size: int = -1
+var _slots_environment_key: Array = []
 var background_layer
 var growth_layer
 var overlay_layer
@@ -68,8 +69,26 @@ func zoom_at(screen_point: Vector2, factor: float) -> void:
 
 
 func clamp_camera() -> void:
+	if game != null and game.service != null and game.service.env.level_id != "apartment":
+		var bounds: Rect2 = game.service.env.bounds
+		camera = camera.clamp(bounds.position, bounds.end)
+		return
 	camera.x = clampf(camera.x, 1.0, 20.0)
 	camera.y = clampf(camera.y, -1.5, 7.0)
+
+
+# 实例身份使重开同一章也刷新；关卡标识可识别原地切换环境的调用方。
+func environment_key() -> Array:
+	return [game.service.env.get_instance_id(), game.service.env.level_id]
+
+
+# 绘制直接消费碰撞、支点、资源与出口的真实数据，避免维护第二份场景坐标。
+func whitebox_geometry() -> Dictionary:
+	var env = game.service.env
+	return {"obstacles": env.obstacles, "surfaces": env.surfaces,
+		"lights": env.lights, "waters": env.waters, "bounds": env.bounds,
+		"exit_rect": env.exit_rect}
+
 
 
 func ensure_visible(position: Vector2) -> void:
@@ -283,10 +302,12 @@ func _atmosphere(state) -> void:
 
 
 func _update_history_slots(state) -> void:
-	if _slots_history_size == state.history.size():
+	var identity: Array = environment_key()
+	if _slots_environment_key == identity and _slots_history_size == state.history.size():
 		return
 	_slots_cache = HistorySlots.compute(state.history)
 	_slots_history_size = state.history.size()
+	_slots_environment_key = identity
 	if _slots_cache.merged and game.has_method("notice_history_merged"):
 		game.notice_history_merged(_slots_cache.batched_count)
 
@@ -298,36 +319,45 @@ func _background() -> void:
 	else:
 		_background_generic()
 	_draw_obstacles_and_waters()
+	if game.service.env.level_id != "apartment":
+		_draw_whitebox_supports()
 
 
 func _background_generic() -> void:
 	brush.draw_rect(get_viewport_rect(), Color("1a2530"))
-	var env = game.service.env
-	# 天空渐变（白盒用纯色分层表示）。
-	var sky: Rect2 = Rect2(env.bounds.position.x, env.bounds.position.y + 4.4, env.bounds.size.x, env.bounds.size.y - 4.4)
-	_rect(Rect2(sky.position.x, sky.position.y, sky.size.x, sky.size.y * 0.5), Color("3d5566"))
-	_rect(Rect2(sky.position.x, sky.position.y + sky.size.y * 0.5, sky.size.x, sky.size.y * 0.5), Color("55707d"))
-	# 地下土壤。
-	_rect(Rect2(env.bounds.position.x, env.bounds.position.y, env.bounds.size.x, 4.4), Color("1c292e"))
-	for x in range(int(env.bounds.position.x), int(env.bounds.position.x + env.bounds.size.x)):
-		_line(Vector2(x, -0.08), Vector2(x + 0.2, -0.2), Color("35474a"), 0.022)
+	var geometry: Dictionary = whitebox_geometry()
+	var bounds: Rect2 = geometry.bounds
+	_rect(bounds, Color("3d5566"))
+	var ground: float = clampf(0.4, bounds.position.y, bounds.end.y)
+	_rect(Rect2(bounds.position, Vector2(bounds.size.x, ground - bounds.position.y)), Color("1c292e"))
+	for fixture in geometry.lights:
+		if fixture.id != "ambient":
+			_rect(fixture.rect, Color(LIGHT, fixture.intensity * 0.055))
 	for speck in _speckles:
-		var point: Vector2 = speck[0]
-		if not env.bounds.has_point(point):
-			continue
-		var color: Color = Color(0.55, 0.6, 0.57, 0.09) if point.y > 0.4 else Color(0.56, 0.51, 0.4, 0.12)
-		brush.draw_circle(to_screen(point), maxf(0.6, speck[1] * unit_scale), color)
-	# 出口标记：白盒用亮色门洞表示。
-	_rect(env.exit_rect, Color("e7c46a", 0.22))
-	_rect(Rect2(env.exit_rect.position, Vector2(env.exit_rect.size.x, 0.06)), Color("e7c46a", 0.8))
-	# 种子标记与锚点支点示意（白盒阶段用简单几何）。
-	for surface in env.surfaces:
-		_line(surface.a, surface.b, Color(BUD, 0.35), 0.02)
+		if bounds.has_point(speck[0]):
+			brush.draw_circle(to_screen(speck[0]), maxf(0.6, speck[1] * unit_scale), Color(0.55, 0.6, 0.57, 0.09))
+
+
+# 支点在实体之后描边；斜板和下沿全部对应真实可攀附线段。
+func _draw_whitebox_supports() -> void:
+	var geometry: Dictionary = whitebox_geometry()
+	for surface in geometry.surfaces:
+		_line(surface.a, surface.b, Color("17252f"), 0.13)
+		_line(surface.a, surface.b, Color("a8b68c"), 0.065)
+		_line(surface.a, surface.b, Color(BUD, 0.85), 0.018)
+		for point in [surface.a, surface.b]:
+			brush.draw_circle(to_screen(point), maxf(2.0, unit_scale * 0.045), BUD)
+	var exit: Rect2 = geometry.exit_rect
+	_rect(exit, Color(LIGHT, 0.22))
+	_polyline([exit.position, Vector2(exit.position.x, exit.end.y), exit.end,
+		Vector2(exit.end.x, exit.position.y), exit.position], Color(LIGHT, 0.9), 0.035)
+	brush.draw_string(ThemeDB.fallback_font, to_screen(Vector2(exit.position.x, exit.end.y)) + Vector2(0, -12),
+		"出口 · 向光生长", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, LIGHT)
 
 
 func _draw_obstacles_and_waters() -> void:
-	var env = game.service.env
-	for obstacle in env.obstacles:
+	var geometry: Dictionary = whitebox_geometry()
+	for obstacle in geometry.obstacles:
 		var color: Color = Color("28393f")
 		if obstacle.id.begins_with("chair"):
 			color = Color("72776b")
@@ -341,7 +371,7 @@ func _draw_obstacles_and_waters() -> void:
 			color = Color("465b68")
 		_rect(obstacle.rect, color)
 		_line(obstacle.rect.position + Vector2(0, obstacle.rect.size.y), obstacle.rect.end, Color(color.lightened(0.15), 0.8), 0.025)
-	for water in env.waters:
+	for water in geometry.waters:
 		if water.id in game.service.state.revealed:
 			var center: Vector2 = water.rect.get_center()
 			for ring in range(4, 0, -1):
@@ -505,6 +535,10 @@ func _polygon(points: Array, color: Color) -> void:
 
 func growth_framing() -> Dictionary:
 	var bounds: Rect2 = game.service.env.bounds
+	if game.service.env.level_id != "apartment":
+		var available_size: Vector2 = (get_viewport_rect().size - Vector2(150, 320)).max(Vector2(1, 1))
+		var fitted_scale: float = maxf(1.0, minf(available_size.x / bounds.size.x, available_size.y / bounds.size.y))
+		return {"camera": bounds.get_center(), "scale": fitted_scale}
 	var low: Vector2 = bounds.position + Vector2(1.0, 1.2)
 	var high: Vector2 = bounds.end - Vector2(4.0, 2.0)
 	for node in game.service.state.nodes.values():

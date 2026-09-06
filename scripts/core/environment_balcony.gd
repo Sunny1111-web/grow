@@ -17,11 +17,11 @@ func _init() -> void:
 		{"id": "floor_right", "rect": Rect2(2.4, -0.15, 5.6, 0.55)},
 		{"id": "floor_lower", "rect": Rect2(9.4, -0.55, 6.6, 0.55)},
 		{"id": "post_a", "rect": Rect2(5.3, 0.4, 0.1, 0.7)},
-		{"id": "post_b", "rect": Rect2(11.35, 0.0, 0.1, 0.9)},
+		{"id": "post_b", "rect": Rect2(11.35, 0.4, 0.1, 0.5)},
 		{"id": "wall", "rect": Rect2(16, 0.4, 0.3, 4.2)},
 		{"id": "left_wall", "rect": Rect2(-0.2, 0.4, 0.2, 9.6)}]
 	surfaces = [
-		{"id": "rail_a", "a": Vector2(4.0, 1.1), "b": Vector2(5.4, 1.1), "normal": Vector2(0, 1)},
+		{"id": "rail_a", "a": Vector2(3.5, 1.0), "b": Vector2(5.4, 1.0), "normal": Vector2(0, 1)},
 		{"id": "beam", "a": Vector2(7.3, 1.1), "b": Vector2(9.6, 0.7), "normal": Vector2(0.212, 0.977)},
 		{"id": "lower_edge", "a": Vector2(9.4, 0.0), "b": Vector2(16.0, 0.0), "normal": Vector2(0, 1)},
 		{"id": "planter", "a": Vector2(10.6, 0.9), "b": Vector2(12.2, 0.9), "normal": Vector2(0, 1)},

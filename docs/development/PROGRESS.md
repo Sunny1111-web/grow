@@ -39,3 +39,10 @@
 - 新手引导（guide.gd）：5步（选种子→拖根接水→长藤→攀附→长叶），每次只提示当前一步，完成即推进并落盘；长时间无进展45秒追加一次详细帮助；菜单可「重看本步引导」「跳过引导」；进度随guide字段持久化（test_guide.gd 15断言）。
 - 关卡扩展：新增levels.gd注册表/level_base.gd基类，environment.gd退化为第一章数据+objective；第二关《断裂的阳台》白盒（environment_balcony.gd）——缺1.4u断口、稀疏支点链、双路线（攀附斜板/绕行下沿）、W2藏断口下；save_service按level_id分关存档；标题页按注册表列章节，is_unlocked读上一关最新存档won；关卡检查器13项对两关全过（validate_level.gd支持--level=）；test_levels.gd 24断言含真实命令回放路线A全程+出口可达+中途长叶产能（test-guide/test-input新增见各节）。
 - 文档：docs/design-v1/05_关卡扩展设计.md（第三章《共生的庭院》仅设计不实现）；docs/development/MANUAL_CHECKS.md（人工验证项清单）。全套8517断言通过；窗口回放Opening（5边1叶0.96E/s）与Journey（won=true,28边5叶,reloaded=true）均无脚本/渲染错误，截图人工视检通过。注意：本轮按账本惯例应先备份原件至C:/backup再修订，实际直接修订并以本次git阶段提交作为备份记录，下轮恢复先备份流程。
+
+2026-09-06 v0.1.2 第二关白盒收尾与章节系统（续前轮，接手时工作区含未提交改动）：
+- 第二关几何再调优：rail_a 左移降低便于开局攀附，post_b 缩短；上下双路线均可真实命令走通并实际胜利（test_balcony_journey：upper/lower × 退守0/2 共4组，接入W2、上下路经过不同支点、纯动作重放能量与证据一致）。
+- 章节系统加固：start_new_game(level_id) 防护（锁定章节/未知ID不动现场）、is_chapter_unlocked/chapter_status、return_to_title 保存并停模拟、跨章继续互不覆盖能量与完成状态、重开第一章不反锁第二章（test_chapter_flow 27断言）。
+- 分关存档持久化与视图跨关刷新：章节解锁重启保留、各代存档回退、绘制缓存串关修复（test_chapter_persistence / test_chapter_view）。
+- 新工具：balcony_runner.gd（阳台真实路线执行器）、capture_balcony.gd + Invoke-Tests.ps1 -BalconyWindow（上下两路真实鼠标回放：均 won=true, reloaded=true，run-20260906-103453-242-3956ef）。
+- 文档：README/项目版本号至0.1.2；补写 reports/2026-09-06-balcony-chapters.md（本轮验证报告）。全套8617断言通过，检查器26项全过；美术与真人试玩留人工清单。本轮发布包与报告此前未随代码落地，已由本轮补齐（导出build/grow-0.1.2-windows并提交）。

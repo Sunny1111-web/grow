@@ -4,6 +4,10 @@ extends Node2D
 var world
 
 
+func _process(_delta: float) -> void:
+	queue_redraw()
+
+
 func _draw() -> void:
 	if world.game == null or world.game.service == null:
 		return

@@ -1,7 +1,7 @@
 extends RefCounted
 
 const Model = preload("res://scripts/core/plant_state.gd")
-const Level = preload("res://scripts/core/environment.gd")
+const Levels = preload("res://scripts/core/levels.gd")
 const SCHEMA: int = 2
 const RULES: String = "grow-p0-v1"
 const LEVEL_ID: String = "apartment"
@@ -11,6 +11,7 @@ var directory: String
 var level_id: String = LEVEL_ID
 # 版本保护：目录里出现未来/异规则世代后暂停写入，防止旧规则进度覆盖它。
 var incompatible_locked: bool = false
+var _checked_directory: bool = false
 
 
 func _init(save_directory: String = "user://saves/chapter1", level_identifier: String = LEVEL_ID) -> void:
@@ -20,6 +21,12 @@ func _init(save_directory: String = "user://saves/chapter1", level_identifier: S
 
 
 func save(state) -> Dictionary:
+	if Levels.get_definition(level_id).is_empty() or directory == "":
+		return {"ok": false, "reason": "未知关卡或存档目录无效"}
+	if not _checked_directory:
+		var existing: Dictionary = load_latest()
+		if existing.found and not existing.ok:
+			return {"ok": false, "reason": existing.reason}
 	if incompatible_locked:
 		return {"ok": false, "reason": "这里存有更新版本游戏的进度，已暂停写入以保护它。"}
 	var payload: Dictionary = {}
@@ -47,7 +54,7 @@ func save(state) -> Dictionary:
 		final_path = directory + "/" + token + ".json"
 	var payload_text: String = JSON.stringify(_encode(payload), "", true, true)
 	var envelope: Dictionary = {"schema_version": SCHEMA, "rules_version": RULES,
-		"level_id": level_id, "level_revision": 1, "engine_build": Engine.get_version_info().hash,
+		"level_id": level_id, "level_revision": Levels.get_definition(level_id).revision, "engine_build": Engine.get_version_info().hash,
 		"generation": generation, "checksum": payload_text.sha256_text(), "payload": payload_text}
 	var text: String = JSON.stringify(envelope, "\t", true, true)
 	if text.to_utf8_buffer().size() > MAX_FILE_BYTES:
@@ -69,10 +76,14 @@ func save(state) -> Dictionary:
 	var rename_error: int = DirAccess.rename_absolute(ProjectSettings.globalize_path(temporary), ProjectSettings.globalize_path(final_path))
 	if rename_error != OK:
 		return {"ok": false, "reason": "无法提交本次存档，旧进度仍保留（%d）" % rename_error}
+	Levels.invalidate_progress()
 	return {"ok": true, "reason": "已保存 · 第%d代" % generation, "generation": generation, "path": final_path}
 
 
 func load_latest() -> Dictionary:
+	if Levels.get_definition(level_id).is_empty() or directory == "":
+		return {"ok": false, "found": true, "future_version": false, "reason": "未知关卡或存档目录无效"}
+	_checked_directory = true
 	var filenames: Array = _generations()
 	if filenames.is_empty():
 		return {"ok": false, "found": false, "reason": "没有已提交的存档", "future_version": false}
@@ -89,13 +100,16 @@ func load_latest() -> Dictionary:
 			result.reason = "最近的存档未能验证，已恢复到第%d代；原文件均已保留。" % result.generation if rejected > 0 else "已继续上次的生长"
 			return result
 		rejected += 1
+	incompatible_locked = true
 	return {"ok": false, "found": true, "future_version": false,
-		"reason": "已有存档均未通过校验。可以开始新的生长，原存档仍保留供恢复。"}
+		"reason": "已有存档均未通过校验，已暂停写入。原文件保留供恢复。"}
 
 
 func _incompatible(reason: String) -> Dictionary:
 	incompatible_locked = true
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
+	if FileAccess.file_exists(directory + "/.incompatible"):
+		return {"ok": false, "future_version": true, "reason": reason}
 	var marker = FileAccess.open(directory + "/.incompatible", FileAccess.WRITE)
 	if marker != null:
 		marker.store_string(reason)
@@ -140,7 +154,14 @@ func _read(path: String) -> Dictionary:
 		return _incompatible("这份存档使用了不同规则版本，无法在这里继续。原存档未修改。")
 	if envelope.schema_version < 1 or envelope.schema_version > SCHEMA or str(envelope.get("rules_version", "")) != RULES:
 		return failure
-	if envelope.get("level_id", "") != level_id or envelope.get("level_revision", 0) != 1:
+	if envelope.get("level_id", "") != level_id:
+		return _incompatible("存档属于其它关卡，已暂停写入以保护原文件。")
+	var definition: Dictionary = Levels.get_definition(level_id)
+	if definition.is_empty():
+		return failure
+	if _number(envelope.get("level_revision")) and envelope.level_revision > definition.revision:
+		return _incompatible("这份存档来自更新的关卡版本，已暂停写入以保护原文件。")
+	if envelope.get("level_revision", 0) != definition.revision:
 		return failure
 	if not envelope.get("payload") is String or not envelope.get("checksum") is String:
 		return failure
@@ -214,7 +235,7 @@ static func _decode(value, depth: int = 0):
 	return value
 
 
-static func _shape_problem(data: Dictionary) -> String:
+func _shape_problem(data: Dictionary) -> String:
 	for field in Model.persistent_fields():
 		if not data.has(field):
 			return "缺少状态字段：" + field
@@ -236,8 +257,54 @@ static func _shape_problem(data: Dictionary) -> String:
 			return "器官索引无效"
 	if not _finite_tree(data):
 		return "状态中包含无效数据"
+	for point in data.explored:
+		if not point is Vector2:
+			return "探索记录坐标无效"
+	for id in data.revealed:
+		if not id is String:
+			return "揭示记录ID无效"
+	for event in data.events:
+		if not event is Dictionary or not event.get("type") is String:
+			return "事件记录无效"
+		if event.has("id") and not (event.id is String or event.id is int):
+			return "事件ID无效"
+		if event.has("tick") and (not event.tick is int or event.tick < 0):
+			return "事件时刻无效"
+		if event.type == "command" and (not event.get("command_id") is String or not event.get("result") is Dictionary):
+			return "命令记录无效"
+	for key in data.scars:
+		var scar = data.scars[key]
+		if not scar is Dictionary or not _has_types(scar, {"pos": TYPE_VECTOR2, "node": TYPE_INT, "slot": TYPE_INT, "issued": TYPE_BOOL, "consumed": TYPE_BOOL, "reason": TYPE_STRING}):
+			return "疤痕记录无效"
+		if scar.node < 1 or scar.node >= data.next_id or scar.slot not in [0, 1] or str(key) != "%d:%d" % [scar.node, scar.slot]:
+			return "疤痕索引无效"
+	for entry in data.history:
+		if not entry is Dictionary or not _has_types(entry, {"type": TYPE_STRING, "data": TYPE_DICTIONARY, "reason": TYPE_STRING, "tick": TYPE_INT}):
+			return "历史记录无效"
+		if entry.tick < 0 or entry.type not in ["edge", "leaf"]:
+			return "历史种类或时刻无效"
+		var organ: Dictionary = entry.data
+		if entry.type == "edge":
+			if not _has_types(entry, {"node": TYPE_DICTIONARY}) or not _has_types(entry.node, {"id": TYPE_INT, "pos": TYPE_VECTOR2, "parent_edge": TYPE_INT, "kind": TYPE_STRING, "anchor": TYPE_DICTIONARY, "emergency": TYPE_BOOL}):
+				return "历史节点无效"
+			if not _has_types(organ, {"id": TYPE_INT, "a": TYPE_INT, "b": TYPE_INT, "kind": TYPE_STRING, "points": TYPE_ARRAY, "slot": TYPE_INT, "emergency": TYPE_BOOL}):
+				return "历史枝条无效"
+			if organ.points.size() < 2 or organ.slot not in [0, 1]:
+				return "历史枝条曲线无效"
+			for point in organ.points:
+				if not point is Vector2:
+					return "历史曲线坐标无效"
+			for field in ["length", "z", "bend"]:
+				if not _number(organ.get(field)) or organ[field] < 0:
+					return "历史枝条数值无效"
+		else:
+			if not _has_types(entry, {"pos": TYPE_VECTOR2}) or not _has_types(organ, {"id": TYPE_INT, "node": TYPE_INT, "emergency": TYPE_BOOL}):
+				return "历史叶片无效"
+			for field in ["angle", "z", "produced"]:
+				if not _number(organ.get(field)):
+					return "历史叶片数值无效"
 	var allowed_anchors: Dictionary = {}
-	for surface in Level.new().surfaces:
+	for surface in Levels.env_for(level_id).surfaces:
 		allowed_anchors[surface.id] = true
 	for node in data.nodes.values():
 		if not node is Dictionary or not _has_types(node, {"id": TYPE_INT, "pos": TYPE_VECTOR2, "parent_edge": TYPE_INT, "kind": TYPE_STRING, "anchor": TYPE_DICTIONARY, "emergency": TYPE_BOOL}):
@@ -297,3 +364,13 @@ static func _finite_tree(value, depth: int = 0) -> bool:
 				return false
 		return true
 	return value is String or value is bool or _number(value)
+
+
+func has_completed_generation() -> bool:
+	if Levels.get_definition(level_id).is_empty():
+		return false
+	for filename in _generations():
+		var result: Dictionary = _read(directory + "/" + filename)
+		if result.ok and result.state.won:
+			return true
+	return false

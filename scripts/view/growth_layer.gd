@@ -17,7 +17,7 @@ func _process(delta: float) -> void:
 
 func sync() -> void:
 	var state = world.game.service.state
-	var key: Array = [world.camera, world.unit_scale, state.history.size(),
+	var key: Array = [world.environment_key(), world.get_viewport_rect().size, world.camera, world.unit_scale, state.history.size(),
 		state.edges.size(), state.leaves.size(), state.tick]
 	if key == _key:
 		return

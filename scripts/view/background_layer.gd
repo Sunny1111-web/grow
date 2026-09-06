@@ -13,7 +13,7 @@ func mark_dirty() -> void:
 
 func sync() -> void:
 	var state = world.game.service.state
-	var key: Array = [world.camera, world.unit_scale, state.revealed.duplicate()]
+	var key: Array = [world.environment_key(), world.get_viewport_rect().size, world.camera, world.unit_scale, state.revealed.duplicate()]
 	if key == _key:
 		return
 	_key = key

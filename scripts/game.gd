@@ -14,6 +14,8 @@ const GameAudio = preload("res://scripts/view/audio.gd")
 var service
 var saves
 var level_id: String = Levels.APARTMENT
+var save_root: String = "user://saves"
+# 兼容旧测试入口：启动前注入save_directory时，把它作为独立测试档案根。
 var save_directory: String = Levels.save_dir_for(Levels.APARTMENT)
 var load_status: Dictionary = {}
 var commands_since_save: int = 0
@@ -64,13 +66,16 @@ func _ready() -> void:
 		if argument.begins_with("--capture="):
 			_capture_path = argument.trim_prefix("--capture=")
 	if _capture_path != "":
-		save_directory = "res://test-results/capture-saves-%d" % Time.get_ticks_usec()
+		save_root = "res://test-results/capture-saves-%d" % Time.get_ticks_usec()
+	elif save_root == "user://saves" and save_directory != Levels.save_dir_for(Levels.APARTMENT):
+		save_root = save_directory
+	save_directory = chapter_save_dir(level_id)
 	audio = GameAudio.new()
 	add_child(audio)
 	_load_game_settings()
 	saves = Saves.new(save_directory, level_id)
 	load_status = saves.load_latest()
-	service = Commands.new(Model.create(), Level.new())
+	service = Commands.new(Model.create(), Levels.env_for(level_id))
 	sim = Simulation.new(service)
 	world = World.new()
 	world.game = self
@@ -109,47 +114,91 @@ func set_low_motion(enabled: bool) -> void:
 	audio.set_setting("ui", "low_motion", enabled)
 
 
-func start_new_game(target_level: String = "") -> void:
-	if target_level != "" and target_level != level_id:
-		_switch_level(target_level, true)
+func chapter_save_dir(id: String) -> String:
+	return Levels.save_dir_for(id, save_root)
+
+
+func chapter_status(id: String) -> Dictionary:
+	if Levels.get_definition(id).is_empty():
+		return {"ok": false, "found": false, "reason": "未知章节", "future_version": false}
+	return Saves.new(chapter_save_dir(id), id).load_latest()
+
+
+func is_chapter_unlocked(id: String) -> bool:
+	return Levels.is_unlocked(id, save_root)
+
+
+func next_chapter() -> String:
+	for definition in Levels.ordered():
+		if definition.unlock_after == level_id and is_chapter_unlocked(definition.id):
+			return definition.id
+	return ""
+
+
+func open_next_chapter() -> void:
+	var target: String = next_chapter()
+	if target == "":
 		return
-	_activate_state(Model.create(), Level.new())
-	hud.set_message("从种子向下拖出两段根，寻找裂缝深处的水。按住空格感知湿润方向。")
-	message_hold = 6.0
-	save_progress()
+	var status: Dictionary = chapter_status(target)
+	if status.get("found", false):
+		continue_game(target)
+	else:
+		start_new_game(target)
+
+
+func start_new_game(target_level: String = "") -> void:
+	_switch_level(level_id if target_level == "" else target_level, true)
 
 
 func continue_game(target_level: String = "") -> void:
-	if target_level != "" and target_level != level_id:
-		_switch_level(target_level, false)
-		return
-	load_status = saves.load_latest()
-	if not load_status.ok:
-		hud.set_message(load_status.reason)
-		return
-	_activate_state(load_status.state, service.env)
-	hud.set_message(load_status.reason if load_status.recovered else objective())
+	_switch_level(level_id if target_level == "" else target_level, false)
 
 
-# 章节切换：重建存档服务与环境；续档失败时回到标题并给出原因。
+func _chapter_error(reason: String) -> void:
+	hud.set_message(reason)
+	if hud.modal != null:
+		hud.show_chapter_error(reason)
+
+
+# 先验证目标和存档，成功后才一起替换章节/环境/状态/存档服务。
 func _switch_level(target_level: String, fresh: bool) -> void:
-	if not Levels.is_unlocked(target_level):
-		hud.set_message("先完成前一关，才能进入新的章节。")
+	if Levels.get_definition(target_level).is_empty():
+		_chapter_error("没有这个章节，当前生长已保留。")
 		return
+	if not is_chapter_unlocked(target_level):
+		_chapter_error("先完成前一关，才能进入新的章节。")
+		return
+	var target_saves = Saves.new(chapter_save_dir(target_level), target_level)
+	var status: Dictionary = target_saves.load_latest()
+	if status.get("future_version", false) or (status.get("found", false) and not status.ok):
+		_chapter_error(status.reason)
+		return
+	if not fresh and not status.ok:
+		_chapter_error("这一章还没有可继续的进度，请选择开始。")
+		return
+	# 切换到另一章前保存当前现场；同章继续必须读取旧代，不能先覆盖它。
+	if started and target_level != level_id:
+		var current_saved: Dictionary = save_progress()
+		if not current_saved.ok:
+			return
+	var plant = Model.create() if fresh else status.state
+	if fresh and target_level != Levels.APARTMENT:
+		plant.guide = {"step": 5, "skipped": true, "helped": false}
+	if fresh:
+		var saved: Dictionary = target_saves.save(plant)
+		if not saved.ok:
+			_chapter_error(saved.reason)
+			return
 	level_id = target_level
-	save_directory = Levels.save_dir_for(level_id)
-	if _capture_path != "":
-		save_directory = "res://test-results/capture-saves-%d" % Time.get_ticks_usec()
-	saves = Saves.new(save_directory, level_id)
-	load_status = saves.load_latest()
-	var env = Levels.env_for(level_id)
-	if fresh or not load_status.ok:
-		if not fresh:
-			hud.set_message(load_status.reason)
-		start_new_game()
-		return
-	_activate_state(load_status.state, env)
-	hud.set_message(load_status.reason if load_status.recovered else objective())
+	save_directory = chapter_save_dir(level_id)
+	saves = target_saves
+	load_status = status
+	_activate_state(plant, Levels.env_for(level_id))
+	if fresh:
+		hud.set_message(objective())
+		message_hold = 6.0
+	else:
+		hud.set_message(status.reason if status.get("recovered", false) else objective())
 
 
 func notice_history_merged(batched_count: int) -> void:
@@ -191,6 +240,7 @@ func _activate_state(plant, env = null) -> void:
 		world.camera = framing.camera
 		world.unit_scale = framing.scale
 	hud.close_modal()
+	hud.refresh_chapter_title()
 
 
 func save_progress(manual: bool = false) -> Dictionary:
@@ -199,6 +249,8 @@ func save_progress(manual: bool = false) -> Dictionary:
 	var result: Dictionary = saves.save(service.state)
 	if result.ok:
 		commands_since_save = 0
+		if service.state.won:
+			Levels.record_completion(level_id, save_root)
 	if manual or not result.ok:
 		hud.set_message(result.reason)
 	return result
