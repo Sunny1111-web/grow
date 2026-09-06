@@ -307,7 +307,8 @@ func _update_guide(delta: float) -> void:
 	if guide_flash_time > 0.0:
 		guide_flash_time = maxf(0.0, guide_flash_time - delta)
 	var step: int = result.step
-	if step != _guide_last_step and step > _guide_last_step and Guide.STEP_FLASH.has(step):
+	# 完成反馈只在本局真实引导过时出现：第二关新档 guide.step=5 不应闪现教学卡。
+	if step != _guide_last_step and step > _guide_last_step and _guide_last_step >= 0 and Guide.STEP_FLASH.has(step):
 		guide_flash_text = str(Guide.STEP_FLASH[step])
 		guide_flash_time = 2.2 if step < Guide.STEPS.size() else 3.2
 	_guide_last_step = step
