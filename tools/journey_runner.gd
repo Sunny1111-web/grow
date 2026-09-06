@@ -13,6 +13,10 @@ var reason: String = ""
 var serial: int = 0
 var shoot: int = 1
 var root_tip: int = 1
+# 置 true 时在通关判定前停下：状态已抵达窗前但未 won，供演示真实走完最后一步。
+var stop_before_win: bool = false
+# 置 true 时在最后一个路标（窗外）前停下：植物已稳定，供演示真实走完最后一段。
+var stop_before_last_waypoint: bool = false
 
 
 func run() -> Dictionary:
@@ -34,13 +38,18 @@ func run() -> Dictionary:
 	# Extra root access is earned through growth; no direct state changes or free E.
 	if not _walk_root(Vector2(8.0, -2.6)):
 		return _report(false)
-	for waypoint in [Vector2(5.2, 1.04), Vector2(5.6, 2.0), Vector2(6.6, 3.7),
-		Vector2(8.7, 3.54), Vector2(10.4, 3.54), Vector2(12.46, 4.7),
-		Vector2(12.46, 5.5), Vector2(15.5, 5.9), Vector2(16.8, 5.9)]:
+	for waypoint_index in range(9):
+		var waypoint: Vector2 = [Vector2(5.2, 1.04), Vector2(5.6, 2.0), Vector2(6.6, 3.7),
+			Vector2(8.7, 3.54), Vector2(10.4, 3.54), Vector2(12.46, 4.7),
+			Vector2(12.46, 5.5), Vector2(15.5, 5.9), Vector2(16.8, 5.9)][waypoint_index]
+		if stop_before_last_waypoint and waypoint_index == 8:
+			return _report(true)
 		if not _walk_shoot(waypoint):
 			return _report(false)
 	if not _stabilize():
 		return _report(false)
+	if stop_before_win:
+		return _report(true)
 	for _i in range(31):
 		sim.step(0.1)
 		seconds += 0.1

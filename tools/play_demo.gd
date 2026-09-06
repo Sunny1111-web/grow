@@ -1,9 +1,13 @@
 extends SceneTree
 
-# 现场演示模式：真实时间回放约35秒的游戏流程，供手动录屏（Win+G / OBS）。
+# 现场演示模式：真实时间通关第一章，供手动录屏（Win+G / OBS）。
 # 用法: godot --path <工程> --script res://tools/play_demo.gd
-# 时间线: 5s准备(此时可开始录屏) -> 第一章20s(接水/攀附/长叶/拉远) -> 阳台9s -> 5s收尾。
-# 控制台会在可开始录屏与演示结束时各打印一条 ">>" 提示。
+# 时间线: 准备期(快速推演到窗外前最后一个路标，此时可开始录屏)
+#         -> 真实拖拽走完最后一段(带实时预览) -> 窗外健康足水3秒判定
+#         -> 结局运镜 -> 通关卡(停留后自动关闭)。
+# 控制台在可开始录屏与演示结束时各打印一条 ">>" 提示。
+
+const WINDOW_TARGET: Vector2 = Vector2(16.8, 5.9)
 
 var game: Node = null
 
@@ -13,7 +17,6 @@ func _init() -> void:
 
 
 func _run() -> void:
-	# ---------- 第一章：开局（准备期，可开始录屏） ----------
 	game = load("res://scenes/main.tscn").instantiate()
 	game.save_root = "res://test-results/play-demo/saves"
 	root.add_child(game)
@@ -22,64 +25,109 @@ func _run() -> void:
 	DisplayServer.window_set_position(Vector2i(0, 0))
 	await process_frame
 	DisplayServer.window_move_to_foreground()
-	print(">> 准备：5秒后开始演示，现在可以开始录屏")
-	await _sleep(5.0)
-	print(">> 演示开始：第一章接水")
-	# 两段根接到水（世界-y向下）。
-	await _drag(_world(_seed_pos()), _world(_seed_pos() + Vector2(0.0, -0.85)), 0.9)
-	await _until(func(): return game.service.state.edges.size() > 0, 3.0)
-	await _sleep(0.8)
-	await _drag(_world(_seed_pos() + Vector2(0.0, -0.85)), _world(_seed_pos() + Vector2(0.0, -1.7)), 0.9)
-	await _until(func(): return not game.service.env.water_contacts(game.service.state).is_empty(), 3.0)
-	await _sleep(1.0)
-	print(">> 长藤与攀附")
-	game.select_tool("vine")
-	await _drag(_world(_seed_pos()), _world(_seed_pos() + Vector2(0.0, 1.0)), 1.0)
-	await _until(func(): return game.service.state.edges.size() >= 3, 3.0)
-	await _drag(_world(_tip_pos()), _world(_tip_pos() + Vector2(0.5, 0.87)), 1.0)
-	await _until(func(): return game.service.state.edges.size() >= 4, 3.0)
-	await _sleep(0.6)
-	print(">> 长叶供能")
-	game.select_tool("leaf")
-	var leaf_target: int = _top_node_id()
-	await _click(leaf_target)
-	await _sleep(0.4)
-	await _click(leaf_target)
-	await _sleep(3.5)
-	print(">> 继续生长，拉远视角")
-	game.select_tool("vine")
-	await _drag(_world(_tip_pos()), _world(_tip_pos() + Vector2(0.95, 0.2)), 0.9)
-	await _sleep(1.2)
-	game.world.unit_scale = 58.0
-	game.world.clamp_camera()
-	await _sleep(2.8)
-	# ---------- 第二章：阳台 ----------
-	print(">> 第二章：断裂的阳台")
-	game.queue_free()
-	await process_frame
-	var completed = load("res://scripts/core/plant_state.gd").create()
-	completed.won = true
-	load("res://scripts/core/save_service.gd").new("res://test-results/play-demo/saves/chapter1", "apartment").save(completed)
-	game = load("res://scenes/main.tscn").instantiate()
-	game.save_root = "res://test-results/play-demo/saves"
-	root.add_child(game)
-	await process_frame
-	game.start_new_game("balcony")
-	game.world.ensure_visible(game.service.state.nodes[game.service.state.seed_id].pos)
-	await _sleep(2.2)
-	game.select_tool("vine")
-	var balcony_seed: Vector2 = game.service.state.nodes[game.service.state.seed_id].pos
-	await _drag(_world(balcony_seed), _world(balcony_seed + Vector2(0.0, 1.05)), 0.9)
-	await _until(func(): return game.service.state.edges.size() > 0, 3.0)
-	await _sleep(0.7)
-	await _drag(_world(_top_node_pos()), _world(_top_node_pos() + Vector2(0.35, 0.94)), 0.9)
-	await _until(func(): return game.service.state.edges.size() >= 2, 3.0)
-	await _sleep(0.7)
-	await _drag(_world(_top_node_pos()), _world(_top_node_pos() + Vector2(0.95, 0.32)), 0.9)
+	# ---------- 准备期：快速推演到窗外前最后一个路标（模拟暂停） ----------
+	print(">> 正在布置第一关终盘…")
+	game.sim.set_frozen("menu", true)
+	var runner = load("res://tools/journey_runner.gd").new()
+	runner.stop_before_last_waypoint = true
+	var witness: Dictionary = runner.run()
+	if not witness.ok:
+		print(">> 布置失败：", witness.reason)
+		quit(1)
+		return
+	# 接管推演出的世界与模拟（植物已长到最后一处支点，仅剩窗外一段）。
+	game.service = runner.service
+	game.sim = runner.sim
+	game.selected_tool = "vine"
+	print(">> 可开始录屏：第一关终盘，将真实拖拽走完窗外最后一段并通关")
 	await _sleep(3.0)
-	print(">> 演示结束（5秒后自动关闭，可停止录屏）")
-	await _sleep(5.0)
+	# ---------- 录屏段：真实拖拽走向窗外并通关 ----------
+	game.sim.set_frozen("menu", false)
+	await _sleep(0.5)
+	if not await _walk_shoot_live(WINDOW_TARGET):
+		print(">> 终盘走位失败，演示提前结束")
+		await _sleep(3.0)
+		quit(1)
+		return
+	print(">> 等待窗外通关判定…")
+	var deadline: float = Time.get_ticks_msec() + 15000.0
+	while not game.service.state.won and Time.get_ticks_msec() < deadline:
+		await create_timer(0.2).timeout
+	if not game.service.state.won:
+		print(">> 未触发通关判定，演示提前结束")
+		await _sleep(3.0)
+		quit(1)
+		return
+	print(">> 通关！结局运镜与通关卡展示中")
+	await _sleep(9.0)
+	print(">> 演示结束（3秒后自动关闭，可停止录屏）")
+	await _sleep(3.0)
 	quit(0)
+
+
+# 真实拖拽版走位：与旅程回放器同款的方向评分（风险作惩罚而非拒绝），
+# 用鼠标拖拽提交，画面上可见预览曲线随拖拽生长。
+func _walk_shoot_live(destination: Vector2) -> bool:
+	for _segment in range(8):
+		var origin: Vector2 = game.service.state.nodes[_top_node_id()].pos
+		if origin.distance_to(destination) < 0.62 or game.service.state.won:
+			return true
+		var best: Dictionary = _best_growth_live("vine", _top_node_id(), destination)
+		if best.is_empty():
+			if not _reinforce_live():
+				print(">> 走位失败：无合法方向且无法强化")
+				return false
+			best = _best_growth_live("vine", _top_node_id(), destination)
+			if best.is_empty():
+				print(">> 走位失败：强化后依然无合法方向")
+				return false
+		await _drag(_world(origin), _world(origin + best.direction * 1.0), 1.0)
+		await _until(func(): return game.animation_remaining <= 0.0, 3.0)
+		var tip_now: Vector2 = game.service.state.nodes[_top_node_id()].pos
+		var risk: float = game.service.metrics().support.max_risk
+		print(">> 走位段：末端 %s 距目标 %.2f 风险 %.2f E %.1f" % [tip_now, tip_now.distance_to(destination), risk, game.service.state.energy])
+		if game.service.state.won:
+			return true
+	return game.service.state.nodes[_top_node_id()].pos.distance_to(destination) < 0.62
+
+
+func _best_growth_live(kind: String, node: int, target: Vector2) -> Dictionary:
+	var origin: Vector2 = game.service.state.nodes[node].pos
+	var desired: float = (target - origin).angle()
+	var best: Dictionary = {}
+	var score: float = 1000000.0
+	for offset in range(-55, 56, 5):
+		var direction: Vector2 = Vector2.from_angle(desired + deg_to_rad(offset))
+		var proposal: Dictionary = game.service.preview(kind, node, direction)
+		if not proposal.ok:
+			continue
+		var endpoint: Vector2 = proposal.points.back()
+		if endpoint.distance_to(target) > origin.distance_to(target) - 0.04:
+			continue
+		var value: float = endpoint.distance_to(target)
+		value += maxf(0.0, proposal.metrics.support.max_risk - 0.9) * 0.5
+		if not proposal.candidate.nodes[proposal.node].anchor.is_empty():
+			value -= 0.15
+		if value < score:
+			score = value
+			best = {"proposal": proposal, "direction": direction}
+	return best
+
+
+func _reinforce_live() -> bool:
+	var before: float = game.service.metrics().support.max_risk
+	var best: Dictionary = {}
+	var best_risk: float = 1000000.0
+	for edge in game.service.state.edges.values():
+		if edge.kind != "vine":
+			continue
+		var proposal: Dictionary = game.service.preview("reinforce", edge.id)
+		if proposal.ok and proposal.metrics.support.max_risk < best_risk:
+			best_risk = proposal.metrics.support.max_risk
+			best = proposal
+	if best.is_empty() or best_risk >= before - 0.000001:
+		return false
+	return game.service.commit(best, "demo-reinforce").ok
 
 
 func _world(position: Vector2) -> Vector2:
@@ -88,14 +136,6 @@ func _world(position: Vector2) -> Vector2:
 
 func _seed_pos() -> Vector2:
 	return game.service.state.nodes[game.service.state.seed_id].pos
-
-
-func _tip_pos() -> Vector2:
-	return _top_node_pos()
-
-
-func _top_node_pos() -> Vector2:
-	return game.service.state.nodes[_top_node_id()].pos
 
 
 func _top_node_id() -> int:
