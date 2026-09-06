@@ -87,6 +87,10 @@ static func _reached_step(game) -> int:
 			elif edge.kind in ["vine", "branch"]:
 				has_vine = true
 		if has_root:
+			# 以根尖真实触水为准：从种子到水源需要两段根，未接入前
+			# 停留在「拖根接水」步骤，不能提前宣告接水。
+			if game.service.env.water_contacts(state).is_empty():
+				return 1
 			var anchored: bool = false
 			for node in state.nodes.values():
 				if not node.anchor.is_empty():

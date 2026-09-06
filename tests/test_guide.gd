@@ -42,15 +42,17 @@ func _step_progression(t) -> void:
 	game._update_guide(3.0)
 	t.check(game.hud.guide_text_label.text == Guide.STEPS[1].text, "反馈后回到步骤说明")
 	game.dragging = false
-	# 第1步：长出第一段根。
+	# 第1步：长出第一段根——尚未触水，不能提前宣告接水。
 	var state = game.service.state
 	var tip: int = state.edges[state.add_edge(1, "root", [Vector2(2, -0.8), Vector2(2, -1.6)])].b
 	result = Guide.evaluate(game)
-	t.check(result.step == 2, "长出根推进到第2步")
+	t.check(result.step == 1 and result.active, "只长一段根未触水，仍停留在拖根接水步骤")
 	t.check(not state.guide.helped, "步进后重置追加帮助")
-	# 第2步：接水后长藤。
+	# 第2步：第二段根尖接到水源，才推进到长藤。
 	tip = state.edges[state.add_edge(tip, "root", [Vector2(2, -1.6), Vector2(2, -2.4)])].b
 	t.check(game.service.env.water_contacts(state).size() > 0, "两根接水")
+	result = Guide.evaluate(game)
+	t.check(result.step == 2, "根尖真实接水后推进到长藤步骤")
 	var vine: int = state.add_edge(1, "vine", [Vector2(2, -0.8), Vector2(2, 0.2)])
 	state.nodes[state.edges[vine].b].kind = "shoot"
 	result = Guide.evaluate(game)
